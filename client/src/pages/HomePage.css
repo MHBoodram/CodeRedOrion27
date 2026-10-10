@@ -10,6 +10,7 @@
   --text: #f9f1f0;
   --muted: rgba(249, 241, 240, 0.7);
   --line: rgba(176, 145, 159, 0.2);
+  --card-shadow: rgba(16, 9, 12, 0.42);
 
   width: min(1320px, calc(100vw - 48px));
   min-height: 860px;

@@ -4,6 +4,8 @@
   --coffee-bean: #714a39;
   --clay-soil: #7d4949;
   --paper: #fff5f6;
+  --panel-surface: rgba(54, 13, 20, 0.88);
+  --panel-border: rgba(255, 245, 246, 0.24);
 
   position: relative;
   isolation: isolate;
@@ -40,10 +42,10 @@
 .sign-in-content {
   width: min(100%, 430px);
   padding: 38px 36px 30px;
-  border: 1px solid rgba(255, 245, 246, 0.24);
-  border-radius: 8px;
-  background: rgba(54, 13, 20, 0.88);
-  box-shadow: 0 24px 70px rgba(31, 5, 10, 0.32);
+  border: 1px solid var(--panel-border);
+  border-radius: 18px;
+  background: var(--panel-surface);
+  box-shadow: 0 24px 70px var(--shadow-strong);
   text-align: center;
   animation: sign-in-arrive 650ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
   backdrop-filter: blur(12px);

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import WeatherBadge from "../components/WeatherBadge.jsx";
 import "./HomePage.css";
 
 const navItems = ["Try-on", "Discover", "Saved", "History"];
@@ -67,10 +68,6 @@ export default function HomePage() {
   const [cameraError, setCameraError] = useState("");
   const [cameraSwitchMessage, setCameraSwitchMessage] = useState("");
   const [capturedFit, setCapturedFit] = useState("");
-  const [weatherStatus, setWeatherStatus] = useState("loading");
-  const [weather, setWeather] = useState(null);
-  const [weatherError, setWeatherError] = useState("");
-  const [weatherAttempt, setWeatherAttempt] = useState(0);
   const videoRef = useRef(null);
   const cameraStreamRef = useRef(null);
   const cameraDevicesRef = useRef([]);
@@ -159,82 +156,11 @@ export default function HomePage() {
     };
   }, [isCameraView, cameraAttempt]);
 
-  useEffect(() => {
-    if (!isCameraView) return undefined;
-
-    let cancelled = false;
-
-    async function loadWeather(latitude, longitude) {
-      try {
-        const params = new URLSearchParams({
-          latitude: latitude.toString(),
-          longitude: longitude.toString(),
-          current: "temperature_2m,apparent_temperature,weather_code,wind_speed_10m",
-          timezone: "auto",
-        });
-        const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`);
-        if (!response.ok) throw new Error("Weather service is temporarily unavailable.");
-
-        const data = await response.json();
-        if (!data.current || typeof data.current.temperature_2m !== "number") {
-          throw new Error("Weather data was incomplete. Please try again later.");
-        }
-        if (!cancelled) {
-          setWeather({
-            temperature: Math.round(data.current.temperature_2m),
-            feelsLike: Math.round(data.current.apparent_temperature),
-            description: getWeatherDescription(data.current.weather_code),
-            windSpeed: Math.round(data.current.wind_speed_10m),
-          });
-          setWeatherStatus("ready");
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setWeatherError(error instanceof Error ? error.message : "Could not load today’s weather.");
-          setWeatherStatus("error");
-        }
-      }
-    }
-
-    if (!navigator.geolocation) {
-      Promise.resolve().then(() => {
-        if (!cancelled) {
-          setWeatherError("Location is not supported by this browser.");
-          setWeatherStatus("error");
-        }
-      });
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      ({ coords }) => loadWeather(coords.latitude, coords.longitude),
-      (error) => {
-        if (!cancelled) {
-          const message = error.code === error.PERMISSION_DENIED
-            ? "Allow location access to see your local weather."
-            : "Could not get your location. Check your connection and try again.";
-          setWeatherError(message);
-          setWeatherStatus("error");
-        }
-      },
-      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 },
-    );
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isCameraView, weatherAttempt]);
-
   function openCameraPage() {
     setCameraError("");
     setCameraSwitchMessage("");
     setCameraStatus("loading");
     setCapturedFit("");
-    setWeather(null);
-    setWeatherError("");
-    setWeatherStatus("loading");
     setActiveTab("Camera");
   }
 
@@ -612,33 +538,7 @@ export default function HomePage() {
                     </div>
                     <span className="weather-icon" aria-hidden="true">☼</span>
                   </div>
-                  {weatherStatus === "loading" && <p className="weather-message" role="status">Checking local weather…</p>}
-                  {weatherStatus === "error" && (
-                    <div className="weather-message weather-error" role="alert">
-                      <p>{weatherError}</p>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setWeatherError("");
-                          setWeatherStatus("loading");
-                          setWeatherAttempt((attempt) => attempt + 1);
-                        }}
-                      >
-                        Retry
-                      </button>
-                    </div>
-                  )}
-                  {weatherStatus === "ready" && weather && (
-                    <>
-                      <div className="weather-temperature">{weather.temperature}°</div>
-                      <p className="weather-description">{weather.description}</p>
-                      <div className="weather-details">
-                        <span>Feels like <strong>{weather.feelsLike}°</strong></span>
-                        <span>Wind <strong>{weather.windSpeed} km/h</strong></span>
-                      </div>
-                      <p className="weather-tip">A light layer is a good call for changing conditions.</p>
-                    </>
-                  )}
+                  <WeatherBadge />
                 </section>
 
                 <section className="rating-card">
