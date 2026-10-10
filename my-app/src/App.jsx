@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import './App.css'
 
-const navItems = ['Discover', 'Trending', 'Closet', 'Saved', 'History', 'Try-on']
+const navItems = ['Try-on', 'Discover', 'Saved', 'History']
 
 const recommendations = [
   {
@@ -61,7 +61,9 @@ function getWeatherDescription(code) {
 }
 
 function App() {
-  const [activeTab, setActiveTab] = useState('Discover')
+  const [hasEntered, setHasEntered] = useState(false)
+  const [loginMessage, setLoginMessage] = useState('')
+  const [activeTab, setActiveTab] = useState('Camera')
   const [cameraAttempt, setCameraAttempt] = useState(0)
   const [cameraStatus, setCameraStatus] = useState('loading')
   const [cameraError, setCameraError] = useState('')
@@ -321,6 +323,52 @@ function App() {
     setCapturedFit(canvas.toDataURL('image/jpeg', 0.88))
   }
 
+  if (!hasEntered) {
+    return (
+      <main className="login-page">
+        <section className="login-card" aria-labelledby="login-heading">
+          <div className="login-brand">
+            <span className="login-brand-mark" aria-hidden="true">FC</span>
+            <span>FASHION CHECK</span>
+          </div>
+          <p className="mini-label">Your personal style edit</p>
+          <h1 id="login-heading">Welcome back.</h1>
+          <p className="login-description">Sign in to pick up where your style story left off.</p>
+
+          <form className="login-form" onSubmit={(event) => {
+            event.preventDefault()
+            setLoginMessage('Login is not connected yet. Your details have not been sent.')
+          }}>
+            <label htmlFor="fashion-check-email">Email or username</label>
+            <input
+              id="fashion-check-email"
+              name="identifier"
+              type="text"
+              autoComplete="username"
+              required
+            />
+            <label htmlFor="fashion-check-password">Password</label>
+            <input
+              id="fashion-check-password"
+              name="password"
+              type="password"
+              autoComplete="current-password"
+              required
+            />
+            <button className="primary-btn login-submit" type="submit">Log in</button>
+          </form>
+
+          {loginMessage && <p className="login-message" role="status">{loginMessage}</p>}
+          <div className="login-divider"><span>PREVIEW</span></div>
+          <button className="secondary-btn guest-entry" type="button" onClick={() => setHasEntered(true)}>
+            View dashboard
+          </button>
+          <p className="login-footnote">Login is a preview only. Use the button above to switch to the dashboard.</p>
+        </section>
+      </main>
+    )
+  }
+
   return (
     <div className="fashion-app">
       <aside className="sidebar">
@@ -366,6 +414,13 @@ function App() {
               <small>Premium</small>
             </div>
           </div>
+          <button
+            type="button"
+            className="secondary-btn dashboard-switch"
+            onClick={() => setHasEntered(false)}
+          >
+            Back to login
+          </button>
         </header>
 
         {!isHistoryView && !isCameraView ? (
