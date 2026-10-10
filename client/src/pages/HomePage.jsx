@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import girlLogo from "../../Girl.svg";
 import WeatherBadge from "../components/WeatherBadge.jsx";
 import "./HomePage.css";
 
@@ -251,7 +252,9 @@ export default function HomePage() {
     <div className="fashion-app">
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-mark">F</div>
+          <div className="brand-mark">
+            <img className="brand-logo" src={girlLogo} alt="Fit Check logo" />
+          </div>
           <div className="brand-copy">
             <span>Fashion</span>
             <strong>Check</strong>

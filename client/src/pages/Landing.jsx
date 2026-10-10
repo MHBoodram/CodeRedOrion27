@@ -1,12 +1,13 @@
 import { Link } from "react-router-dom";
+import girlLogo from "../../Girl.svg";
 import "./SignIn.css";
 
 function BrandMark() {
   return (
-    <Link className="sign-in-brand" to="/" aria-label="Fit Check home">
-      <span className="sign-in-bubble" aria-hidden="true">fc</span>
+    <div className="sign-in-brand" aria-label="Fit Check brand mark">
+      <img className="sign-in-brand-logo" src={girlLogo} alt="Fit Check logo" />
       <span className="sign-in-brand-name">FIT CHECK</span>
-    </Link>
+    </div>
   );
 }
 

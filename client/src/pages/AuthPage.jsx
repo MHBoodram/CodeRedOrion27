@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import girlLogo from "../../Girl.svg";
 import "./Auth.css";
 
 const USER_STORAGE_KEY = "fitcheck-user";
@@ -25,10 +26,10 @@ function saveUser(user) {
 
 function AuthBrand() {
   return (
-    <Link className="auth-brand" to="/" aria-label="Fit Check home">
-      <span className="auth-brand-bubble" aria-hidden="true">fc</span>
+    <div className="auth-brand" aria-label="Fit Check brand mark">
+      <img className="auth-brand-logo" src={girlLogo} alt="Fit Check logo" />
       <span>FIT CHECK</span>
-    </Link>
+    </div>
   );
 }
 
