@@ -30,6 +30,22 @@ app.get('/api/health', async (req, res) => {
   res.json({ status: 'ok' });
 });
 
+
+app.get('/', (req, res) => {
+  res.json({
+    name: 'FitCheck API',
+    status: 'running',
+    health: '/api/health',
+    endpoints: {
+      auth: '/api/auth',
+      users: '/api/users',
+      items: '/api/items',
+      outfits: '/api/outfits',
+    },
+    example: '/api/outfits?sort=top',
+  });
+});
+
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/items', require('./routes/items'));
