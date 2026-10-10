@@ -179,6 +179,26 @@
   background: #c5acb8;
 }
 
+.auth-demo-admin {
+  width: 100%;
+  min-height: 42px;
+  margin-top: 10px;
+  border: 1px solid rgba(176, 145, 159, 0.62);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--auth-paper);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+
+.auth-demo-admin:hover {
+  border-color: var(--auth-lilac);
+  background: rgba(176, 145, 159, 0.14);
+}
+
 .profile-fields {
   margin-top: 8px;
   border-top: 1px solid rgba(255, 245, 246, 0.16);
