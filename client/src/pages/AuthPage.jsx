@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import girlLogo from "../../Girl.svg";
+import girlLogo from "../../../Girl(2).svg";
 import "./Auth.css";
 
 const USER_STORAGE_KEY = "fitcheck-user";
@@ -28,7 +28,6 @@ function AuthBrand() {
   return (
     <div className="auth-brand" aria-label="Fit Check brand mark">
       <img className="auth-brand-logo" src={girlLogo} alt="Fit Check logo" />
-      <span>FIT CHECK</span>
     </div>
   );
 }
@@ -128,15 +127,9 @@ export default function AuthPage({ mode }) {
   }
 
   return (
-    <main className="auth-page">
-      <img
-        className="auth-backdrop"
-        src="https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&w=1800&q=90"
-        alt=""
-        aria-hidden="true"
-      />
+    <main className={`auth-page${isSignup ? " auth-page-signup" : ""}`}>
+      <AuthBrand />
       <section className={`auth-panel${isSignup ? " auth-panel-signup" : ""}`} aria-labelledby="auth-heading">
-        <AuthBrand />
         <p className="auth-kicker">YOUR PERSONAL STYLE EDIT</p>
         <h1 id="auth-heading">{isSignup ? "Create your profile" : "Welcome back."}</h1>
         <p className="auth-description">

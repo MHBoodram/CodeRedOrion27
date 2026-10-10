@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import girlLogo from "../../Girl.svg";
+import girlLogo from "../../../Girl(2).svg";
 import WeatherBadge from "../components/WeatherBadge.jsx";
 import "./HomePage.css";
 

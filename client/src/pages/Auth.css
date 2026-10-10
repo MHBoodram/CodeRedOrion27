@@ -1,4 +1,9 @@
 .auth-page {
+  --slide-winter: url("/photos/Winter%20outfit%20under%20budget.jpg");
+  --slide-streetwear: url("/photos/Oversized%20Streetwear%20Outfit%20for%20Men%20_%20Baggy%20Fashion%20Inspiration.jpg");
+  --slide-autumn: url("/photos/Autumn%20Fits.jpg");
+  --slide-leeyjohn: url("/photos/leeyjohn_%20IG%20fits.jpg");
+  --slide-xiaoxiao: url("/photos/xiaoxiao%20outfits%E2%80%99.jpg");
   --auth-cherry: #681219;
   --auth-lilac: #b0919f;
   --auth-paper: #fff5f6;
@@ -8,38 +13,86 @@
   position: relative;
   isolation: isolate;
   display: grid;
+  row-gap: 24px;
+  grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr);
+  height: 100svh;
   min-height: 100svh;
   place-items: center;
   overflow: auto;
   padding: 28px 18px;
-  background:
-    radial-gradient(ellipse at center, rgba(125, 73, 73, 0.55), rgba(104, 18, 25, 0.93) 63%),
-    var(--auth-cherry);
+  background-color: #3f0b12;
+  background-image:
+    linear-gradient(180deg, #b09190 0%, #b09190 48%, #3f0b12 78%, #3f0b12 100%),
+    linear-gradient(180deg, #b09190 0%, #b09190 48%, #3f0b12 78%, #3f0b12 100%),
+    linear-gradient(180deg, #b09190 0%, #b09190 48%, #3f0b12 78%, #3f0b12 100%);
+  background-size: 100% 100%, 1px 100%, 1px 100%;
+  background-position: left top, 33.333% top, 66.667% top;
+  background-repeat: no-repeat;
   color: var(--auth-paper);
 }
 
-.auth-page::before {
-  position: absolute;
-  z-index: -1;
-  inset: 0;
-  background: rgba(77, 10, 20, 0.44);
-  content: "";
+.auth-page-signup {
+  height: auto;
+  row-gap: 16px;
+  grid-template-rows: auto auto;
+  align-content: center;
 }
 
-.auth-backdrop {
+.auth-page-signup .auth-brand-logo {
+  width: 200px;
+  max-height: 220px;
+}
+
+.auth-page:not(.auth-page-signup) {
+  height: auto;
+  grid-template-rows: auto auto;
+  align-content: center;
+  row-gap: 16px;
+}
+
+.auth-page:not(.auth-page-signup) .auth-brand {
+  padding-top: 8px;
+}
+
+.auth-page:not(.auth-page-signup) .auth-brand-logo {
+  width: 200px;
+  max-height: 220px;
+}
+
+.auth-page::before {
+  content: "";
   position: absolute;
+  inset: 0 auto 0 0;
+  width: calc(100% / 3);
   z-index: -2;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center 31%;
-  opacity: 0.52;
+  background-image: linear-gradient(rgba(24, 10, 13, 0.28), rgba(24, 10, 13, 0.28)), var(--slide-leeyjohn);
+  background-size: cover;
+  background-position: center;
+  -webkit-mask-image: linear-gradient(to right, #000 0%, #000 90%, transparent 100%);
+  mask-image: linear-gradient(to right, #000 0%, #000 90%, transparent 100%);
+  animation: authSlideLeft 24s linear infinite;
+}
+
+.auth-page::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: calc(100% / 3);
+  z-index: -2;
+  background-image: linear-gradient(rgba(24, 10, 13, 0.28), rgba(24, 10, 13, 0.28)), var(--slide-xiaoxiao);
+  background-size: cover;
+  background-position: center;
+  -webkit-mask-image: linear-gradient(to left, #000 0%, #000 90%, transparent 100%);
+  mask-image: linear-gradient(to left, #000 0%, #000 90%, transparent 100%);
+  animation: authSlideRight 24s linear infinite;
 }
 
 .auth-panel {
-  width: min(100%, 430px);
-  padding: 32px 34px 25px;
+  position: relative;
+  grid-row: 2;
+  z-index: 1;
+  width: min(100%, 380px);
+  padding: 20px 20px 16px;
   border: 1px solid var(--auth-border);
   border-radius: 18px;
   background: var(--auth-surface);
@@ -50,29 +103,32 @@
 }
 
 .auth-panel-signup {
-  width: min(100%, 470px);
-  padding-block: 26px 22px;
+  width: min(100%, 430px);
+  padding: 16px 18px 14px;
 }
 
 .auth-brand {
-  display: inline-flex;
-  flex-direction: column;
+  grid-row: 1;
+  align-self: center;
+  display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  padding-top: 32px;
+  z-index: 3;
   color: var(--auth-paper);
-  font-size: 12px;
-  font-weight: 800;
-  margin: 0 auto 6px;
+}
+
+.auth-page-signup .auth-brand {
+  padding-top: 8px;
 }
 
 .auth-brand-logo {
   display: block;
-  width: 110px;
+  width: 320px;
+  max-width: calc(100vw - 40px);
   height: auto;
-  max-height: 140px;
+  max-height: 340px;
   object-fit: contain;
-  filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.22));
   background: transparent;
   border: 0;
   border-radius: 0;
@@ -81,7 +137,7 @@
 }
 
 .auth-kicker {
-  margin: 20px 0 9px;
+  margin: 0 0 5px;
   color: #ddc7d0;
   font-size: 9px;
   font-weight: 750;
@@ -243,7 +299,43 @@
   font-size: 10px;
   line-height: 1.4;
 }
+@keyframes authSlideLeft {
+  0% {
+    background-image: linear-gradient(rgba(24, 10, 13, 0.28), rgba(24, 10, 13, 0.28)), var(--slide-leeyjohn);
+    background-position: center 20%;
+  }
+  33% {
+    background-image: linear-gradient(rgba(24, 10, 13, 0.28), rgba(24, 10, 13, 0.28)), var(--slide-winter);
+    background-position: center 85%;
+  }
+  66% {
+    background-image: linear-gradient(rgba(24, 10, 13, 0.28), rgba(24, 10, 13, 0.28)), var(--slide-streetwear);
+    background-position: center 25%;
+  }
+  100% {
+    background-image: linear-gradient(rgba(24, 10, 13, 0.28), rgba(24, 10, 13, 0.28)), var(--slide-leeyjohn);
+    background-position: center 20%;
+  }
+}
 
+@keyframes authSlideRight {
+  0% {
+    background-image: linear-gradient(rgba(24, 10, 13, 0.28), rgba(24, 10, 13, 0.28)), var(--slide-xiaoxiao);
+    background-position: center 30%;
+  }
+  33% {
+    background-image: linear-gradient(rgba(24, 10, 13, 0.28), rgba(24, 10, 13, 0.28)), var(--slide-autumn);
+    background-position: center 80%;
+  }
+  66% {
+    background-image: linear-gradient(rgba(24, 10, 13, 0.28), rgba(24, 10, 13, 0.28)), var(--slide-leeyjohn);
+    background-position: center 20%;
+  }
+  100% {
+    background-image: linear-gradient(rgba(24, 10, 13, 0.28), rgba(24, 10, 13, 0.28)), var(--slide-xiaoxiao);
+    background-position: center 30%;
+  }
+}
 @keyframes auth-arrive {
   from {
     opacity: 0;
@@ -258,7 +350,11 @@
 
 @media (max-width: 480px) {
   .auth-panel {
-    padding: 27px 22px 23px;
+    padding: 16px 16px 14px;
+  }
+
+  .auth-panel-signup {
+    padding: 14px 14px 12px;
   }
 
   .auth-panel h1 {

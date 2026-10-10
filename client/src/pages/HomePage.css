@@ -190,15 +190,14 @@
 }
 
 .brand-mark {
-  width: 48px;
-  height: 48px;
+  width: 62px;
+  height: 62px;
   display: grid;
   place-items: center;
-  border-radius: 16px;
+  border-radius: 18px;
   overflow: hidden;
   background: linear-gradient(135deg, var(--lilac-ash), var(--coffee-bean));
   border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 8px 24px rgba(17, 10, 13, 0.22);
 }
 
 .brand-logo {
@@ -206,7 +205,7 @@
   height: 100%;
   object-fit: contain;
   display: block;
-  padding: 6px;
+  padding: 8px;
 }
 
 .brand-copy {
