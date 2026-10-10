@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import "./Auth.css";
 
 const USER_STORAGE_KEY = "fitcheck-user";
@@ -53,6 +53,7 @@ function ProfileFields() {
 export default function AuthPage({ mode }) {
   const isSignup = mode === "signup";
   const [message, setMessage] = useState("");
+  const navigate = useNavigate();
 
   function handleSubmit(event) {
     event.preventDefault();
@@ -82,6 +83,7 @@ export default function AuthPage({ mode }) {
 
       setMessage("Profile saved on this browser. Your password was not stored.");
       event.currentTarget.reset();
+      navigate("/home");
       return;
     }
 
@@ -103,6 +105,7 @@ export default function AuthPage({ mode }) {
     }
 
     setMessage(`Profile found for ${savedUser.name}. Password verification requires server authentication.`);
+    navigate("/home");
   }
 
   function handleDemoAdmin() {
@@ -117,6 +120,7 @@ export default function AuthPage({ mode }) {
     try {
       window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(demoSession));
       setMessage("Demo admin session started on this browser. This is not secure authentication.");
+      navigate("/home");
     } catch {
       setMessage("Could not start the demo admin session in this browser.");
     }

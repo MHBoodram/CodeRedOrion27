@@ -1,7 +1,8 @@
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import Landing from "./pages/Landing.jsx";
 import Login from "./pages/Login.jsx";
 import Signup from "./pages/Signup.jsx";
+import HomePage from "./pages/HomePage.jsx";
 
 export default function App() {
   return (
@@ -9,8 +10,9 @@ export default function App() {
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
-      <Route path="/home" element={<h1>Home (coming soon)</h1>} />
-      <Route path="/analyze" element={<h1>Analyze (coming soon)</h1>} />
+      <Route path="/home" element={<HomePage />} />
+      <Route path="/analyze" element={<HomePage />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
