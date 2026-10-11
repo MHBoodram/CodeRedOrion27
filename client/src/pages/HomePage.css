@@ -1603,6 +1603,32 @@
   box-shadow: 0 0 0 4px rgba(122, 229, 175, 0.22);
 }
 
+.camera-countdown-overlay {
+  position: absolute;
+  z-index: 1;
+  display: grid;
+  width: 144px;
+  aspect-ratio: 1;
+  place-content: center;
+  gap: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  border-radius: 50%;
+  background: rgba(20, 13, 15, 0.72);
+  color: var(--text);
+  text-align: center;
+  backdrop-filter: blur(4px);
+}
+
+.camera-countdown-overlay strong {
+  font-size: 3.5rem;
+  line-height: 1;
+}
+
+.camera-countdown-overlay span {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
 .camera-controls {
   display: flex;
   flex-wrap: wrap;
@@ -1623,6 +1649,65 @@
 .upload-photo-button,
 .switch-camera-button {
   min-height: 46px;
+}
+
+.camera-countdown-picker {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.camera-countdown-picker legend {
+  margin-bottom: 5px;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.camera-countdown-options {
+  display: flex;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.camera-countdown-options label {
+  position: relative;
+  cursor: pointer;
+}
+
+.camera-countdown-options label + label {
+  border-left: 1px solid var(--line);
+}
+
+.camera-countdown-options input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.camera-countdown-options span {
+  display: block;
+  padding: 8px 10px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.camera-countdown-options input:checked + span {
+  background: var(--black-cherry);
+  color: var(--text);
+}
+
+.camera-countdown-options input:focus-visible + span {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid var(--lilac-ash);
+  outline-offset: -2px;
+}
+
+.camera-countdown-picker:disabled {
+  opacity: 0.7;
 }
 
 .shutter-icon {

@@ -141,6 +141,8 @@ export default function HomePage() {
   const [cameraStatus, setCameraStatus] = useState("idle");
   const [cameraError, setCameraError] = useState("");
   const [cameraSwitchMessage, setCameraSwitchMessage] = useState("");
+  const [photoCountdown, setPhotoCountdown] = useState(3);
+  const [countdownRemaining, setCountdownRemaining] = useState(null);
   const [currentWeather, setCurrentWeather] = useState(null);
   const [capturedFit, setCapturedFit] = useState("");
   const [targetStyle, setTargetStyle] = useState("");
@@ -152,6 +154,7 @@ export default function HomePage() {
   const cameraStreamRef = useRef(null);
   const cameraDevicesRef = useRef([]);
   const cameraSessionRef = useRef(0);
+  const photoCountdownTimerRef = useRef(null);
   const accountMenuRef = useRef(null);
   const notificationMenuRef = useRef(null);
   const accountMenuCloseTimerRef = useRef(null);
@@ -160,6 +163,7 @@ export default function HomePage() {
   const isStyleGuideView = activeTab === "Style Guide";
   const isCameraView = activeTab === "Camera";
   const isFriendsView = activeTab === "Friends";
+  const isPhotoCountdownActive = countdownRemaining !== null && photoCountdownTimerRef.current !== null;
   const unreadNotificationCount = notifications.filter((notification) => !notification.read).length;
   const fitRatingOutOfFive = typeof analysisResult?.score === "number"
     ? Math.max(0, Math.min(5, analysisResult.score / 2))
@@ -261,6 +265,15 @@ export default function HomePage() {
     };
   }, [isCameraView, cameraStarted]);
 
+  useEffect(() => {
+    if (isCameraView && cameraStarted) return;
+
+    window.clearTimeout(photoCountdownTimerRef.current);
+    photoCountdownTimerRef.current = null;
+  }, [isCameraView, cameraStarted]);
+
+  useEffect(() => () => window.clearTimeout(photoCountdownTimerRef.current), []);
+
   function openCameraPage() {
     setCameraError("");
     setCameraSwitchMessage("");
@@ -279,11 +292,40 @@ export default function HomePage() {
   }
 
   function setOutfitPhoto(photoData) {
+    cancelPhotoCountdown();
     setCapturedFit(photoData);
     resetStyleAnalysis();
   }
 
+  function cancelPhotoCountdown() {
+    window.clearTimeout(photoCountdownTimerRef.current);
+    photoCountdownTimerRef.current = null;
+    setCountdownRemaining(null);
+  }
+
+  function startPhotoCountdown() {
+    const deadline = Date.now() + photoCountdown * 1000;
+    setCountdownRemaining(photoCountdown);
+
+    function updateCountdown() {
+      const remaining = Math.ceil((deadline - Date.now()) / 1000);
+      if (remaining <= 0) {
+        photoCountdownTimerRef.current = null;
+        setCountdownRemaining(null);
+        captureFit();
+        return;
+      }
+
+      setCountdownRemaining(remaining);
+      const nextTick = deadline - (remaining - 1) * 1000 - Date.now();
+      photoCountdownTimerRef.current = window.setTimeout(updateCountdown, Math.max(1, nextTick));
+    }
+
+    photoCountdownTimerRef.current = window.setTimeout(updateCountdown, 1000);
+  }
+
   async function startCamera() {
+    setCountdownRemaining(null);
     setCameraError("");
     setCameraStatus("loading");
     setCameraStarted(true);
@@ -330,6 +372,7 @@ export default function HomePage() {
   }
 
   function retakePhoto() {
+    cancelPhotoCountdown();
     setCapturedFit("");
     setCameraError("");
     setCameraStarted(false);
@@ -338,6 +381,7 @@ export default function HomePage() {
   }
 
   function backToPhotoChoices() {
+    cancelPhotoCountdown();
     setCameraError("");
     setCameraSwitchMessage("");
     setCameraStarted(false);
@@ -1051,6 +1095,12 @@ export default function HomePage() {
                     {!capturedFit && cameraStarted && cameraStatus === "ready" && (
                       <span className="camera-live"><span /> Camera is on</span>
                     )}
+                    {!capturedFit && cameraStarted && isPhotoCountdownActive && (
+                      <div className="camera-countdown-overlay" role="status" aria-live="assertive">
+                        <strong>{countdownRemaining}</strong>
+                        <span>Get ready</span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="camera-controls">
@@ -1059,6 +1109,25 @@ export default function HomePage() {
                         <span aria-hidden="true">⇄</span>
                         Switch camera
                       </button>
+                    )}
+                    {!capturedFit && cameraStarted && cameraStatus === "ready" && (
+                      <fieldset className="camera-countdown-picker" disabled={isPhotoCountdownActive}>
+                        <legend>Photo timer</legend>
+                        <div className="camera-countdown-options">
+                          {[3, 5, 10].map((seconds) => (
+                            <label key={seconds}>
+                              <input
+                                type="radio"
+                                name="photo-countdown"
+                                value={seconds}
+                                checked={photoCountdown === seconds}
+                                onChange={() => setPhotoCountdown(seconds)}
+                              />
+                              <span>{seconds} sec</span>
+                            </label>
+                          ))}
+                        </div>
+                      </fieldset>
                     )}
                     {capturedFit ? (
                       <>
@@ -1073,11 +1142,11 @@ export default function HomePage() {
                       <button
                         type="button"
                         className="primary-btn capture-button"
-                        onClick={captureFit}
+                        onClick={isPhotoCountdownActive ? cancelPhotoCountdown : startPhotoCountdown}
                         disabled={cameraStatus !== "ready"}
                       >
                         <span className="shutter-icon" aria-hidden="true" />
-                        Take fit photo
+                        {isPhotoCountdownActive ? "Cancel countdown" : "Take fit photo"}
                       </button>
                     ) : null}
                     <span>Your photo stays in this session and is not uploaded.</span>
