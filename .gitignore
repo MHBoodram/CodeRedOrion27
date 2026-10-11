@@ -1,2 +1,76 @@
+# ===== Secrets (Tiger Data / Postgres / API keys) =====
 .env
-tiger-cloud-fitcheckdb-credentials.env
+.env.*
+!.env.example
+*.env
+!.env.example
+tiger-cloud-*credentials*
+*credentials*.env
+*.pem
+*.key
+*.p12
+secrets/
+service-account*.json
+.pgpass
+pgpass.conf
+
+# ===== Node / npm =====
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.npm/
+.eslintcache
+*.tsbuildinfo
+# keep package-lock.json committed
+
+# ===== Frontend build output =====
+dist/
+build/
+.vite/
+.next/
+.cache/
+coverage/
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+ENV/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# ===== Database dumps / local data =====
+*.dump
+*.sql.gz
+*.sqlite
+*.sqlite3
+*.db
+pgdata/
+
+# ===== Logs / temp =====
+*.log
+logs/
+tmp/
+*.tmp
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===== Editors / IDEs =====
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
