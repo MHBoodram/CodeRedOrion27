@@ -1,11 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-<<<<<<< HEAD
 import { api, describeError, saveAuth } from "../api.js";
 import girlLogo from "../assets/Girl(2).svg";
-=======
-import girlLogo from "../assets/Girl(7).svg";
->>>>>>> 02d5318116ca24e31105e72fb403a70a7c2bba8f
 import "./Auth.css";
 
 function AuthBrand() {
@@ -28,10 +24,6 @@ export default function AuthPage({ mode }) {
     const formData = new FormData(form);
     setMessage("");
 
-<<<<<<< HEAD
-    if (isSignup && formData.get("password") !== formData.get("confirm_password")) {
-      setMessage("Those passwords do not match.");
-=======
     if (isSignup) {
       if (formData.get("password") !== formData.get("confirm_password")) {
         setMessage("Those passwords do not match.");
@@ -57,7 +49,6 @@ export default function AuthPage({ mode }) {
       setMessage("Profile saved on this browser. Your password was not stored.");
       event.currentTarget.reset();
       navigate("/home");
->>>>>>> 02d5318116ca24e31105e72fb403a70a7c2bba8f
       return;
     }
 
