@@ -20,17 +20,12 @@ Reply with ONLY JSON in this exact shape:
 {
   "score": number from 1 to 10 or null,
   "verdict": "one short, fun sentence",
-<<<<<<< HEAD
-  "detectedStyle": "streetwear | techwear | academia | gothic | business casual | business professional | smart | other",
-  "colors": ["main colors you see"],
-=======
   "fitGiving": {
     "vibe": "a short description of what the outfit is giving",
     "closestStyle": "the existing style category most similar to this outfit",
     "reason": "one short reason for the style match"
   },
   "colors": ["#RRGGBB", "#RRGGBB", "#RRGGBB", "#RRGGBB"],
->>>>>>> f013c8724235d03b73a7965efc685ee608758a57
   "colorsMatch": true or false,
   "whatsWorking": ["short bullet"],
   "improvements": ["short bullet"],
