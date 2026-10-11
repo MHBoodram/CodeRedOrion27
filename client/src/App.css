@@ -130,7 +130,7 @@
   background: var(--lilac-ash);
   box-shadow: 0 6px 0 var(--coffee-bean);
   color: var(--black-cherry);
-  font-family: "Arial Rounded MT Bold", "Trebuchet MS", sans-serif;
+  font-family: "Montserrat", sans-serif;
   font-size: 58px;
   font-weight: 900;
   letter-spacing: 0;
@@ -150,7 +150,7 @@
 .welcome-note {
   margin: 8px 0 0;
   color: #eadfe3;
-  font-family: "Brush Script MT", "Segoe Script", cursive;
+  font-family: "Montserrat", sans-serif;
   font-size: 20px;
   font-style: italic;
   line-height: 1.2;
@@ -570,7 +570,7 @@
   background: var(--lilac-ash);
   box-shadow: inset 0 -3px 0 rgba(104, 18, 25, 0.16);
   color: var(--black-cherry);
-  font-family: "Arial Rounded MT Bold", "Trebuchet MS", sans-serif;
+  font-family: "Montserrat", sans-serif;
   font-size: 13px;
   font-weight: 900;
 }
@@ -670,7 +670,7 @@
 
 .fit-intro h1 em {
   color: var(--lilac-ash);
-  font-family: "Brush Script MT", "Segoe Script", cursive;
+  font-family: "Montserrat", sans-serif;
   font-size: 1.08em;
   font-weight: 500;
   letter-spacing: 0;
