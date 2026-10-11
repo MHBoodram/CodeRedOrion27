@@ -1248,8 +1248,7 @@ export default function HomePage() {
                         {isPhotoCountdownActive ? "Cancel countdown" : "Take fit photo"}
                       </button>
                     ) : null}
-                    <span>Your photo is only sent when you tap Analyze. It goes to our server and Google Gemini; only a small preview is saved to your Past Fits.</span>
-                  </div>
+                    </div>
                   {cameraSwitchMessage && <p className="camera-switch-message" role="status">{cameraSwitchMessage}</p>}
                 </section>
 

@@ -69,13 +69,12 @@ export default function AuthPage({ mode }) {
     }
   }
 
-  // Dev-only shortcut: signs in as the seeded demo user through the REAL API, so you get a
-  // real token and every authed call (feed, analyze) works. Needs `npm run seed` to have run.
+  // Dev-only shortcut: signs in as the seeded admin demo user through the real API.
   async function handleDemoLogin() {
     setMessage("");
     setSubmitting(true);
     try {
-      await login("alice", "password123");
+      await login("admin", "password123");
       navigate(destination, { replace: true });
     } catch (error) {
       setMessage(`Demo login failed: ${friendlyError(error, false)} (is the backend running and seeded?)`);

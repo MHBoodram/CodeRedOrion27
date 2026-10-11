@@ -83,6 +83,17 @@ const comments = [
 ];
 
 async function main() {
+  const { rows: existingAdmin } = await db.query('SELECT 1 FROM users WHERE username = $1', ['admin']);
+  if (!existingAdmin.length) {
+    const adminHash = await bcrypt.hash(PASSWORD, 10);
+    await db.query(
+      `INSERT INTO users (username, email, password_hash, display_name, bio, avatar_url)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      ['admin', 'admin@example.com', adminHash, 'FitCheck Admin', 'Demo account for local development.', img('admin')]
+    );
+    console.log('Seeded demo login "admin".');
+  }
+
   const { rows: existing } = await db.query('SELECT 1 FROM users WHERE username = ANY($1)', [
     users.map((u) => u.username),
   ]);
@@ -166,7 +177,7 @@ async function main() {
   });
 
   console.log(`Seeded ${users.length} users and ${outfits.length} outfits.`);
-  console.log(`Log in with username "alice" (or bob, carla, dev) and password "${PASSWORD}".`);
+  console.log(`Log in with username "admin" (or alice, bob, carla, dev) and password "${PASSWORD}".`);
 }
 
 main()
