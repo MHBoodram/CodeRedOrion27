@@ -31,7 +31,36 @@ function timeAgo(iso) {
   return `${Math.round(hours / 24)} d ago`;
 }
 
-const navItems = ["Today's Fit", "Past Fits", "Friends", "Saved", "Style Guide"];
+const colorSwatches = {
+  indigo: "#49436f",
+  navy: "#293b58",
+  blue: "#47769a",
+  white: "#f4f0e9",
+  cream: "#e9ddc6",
+  tan: "#c3a477",
+  beige: "#cbb99c",
+  brown: "#79563f",
+  black: "#242124",
+  gray: "#858286",
+  grey: "#858286",
+  olive: "#73724a",
+  green: "#55745b",
+  red: "#9b4547",
+  burgundy: "#6e303e",
+  purple: "#755880",
+  pink: "#c57f91",
+  yellow: "#d5b84f",
+  orange: "#c57a44",
+};
+
+function getColorSwatch(color, index) {
+  const normalized = color.trim().toLowerCase();
+  if (/^#[\da-f]{3}(?:[\da-f]{3})?(?:[\da-f]{2})?$/i.test(normalized)) return normalized;
+  const match = Object.keys(colorSwatches).find((name) => normalized.includes(name));
+  return match ? colorSwatches[match] : `hsl(${(index * 67 + 18) % 360} 30% 48%)`;
+}
+
+const navItems = ["Today's Fit", "Past Fits", "Friends", "Style Guide"];
 
 function getWeatherDescription(code) {
   if (code === 0) return "Clear skies";
@@ -45,36 +74,43 @@ function getWeatherDescription(code) {
   return "Check local conditions";
 }
 
-function resizeImageFile(file) {
+async function resizeImageFile(file, maxSize = MAX_OUTFIT_IMAGE_EDGE) {
+  const bitmap = await createImageBitmap(file);
+  try {
+    const scale = Math.min(1, maxSize / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Could not prepare that image.");
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.8));
+    if (!blob) throw new Error("Could not compress that image. Please try another photo.");
+    return blob;
+  } finally {
+    bitmap.close();
+  }
+}
+
+function blobToDataUrl(blob) {
   return new Promise((resolve, reject) => {
-    const objectUrl = URL.createObjectURL(file);
-    const image = new Image();
-
-    image.onload = () => {
-      try {
-        const scale = Math.min(1, MAX_OUTFIT_IMAGE_EDGE / Math.max(image.naturalWidth, image.naturalHeight));
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
-        canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
-        const context = canvas.getContext("2d");
-        if (!context) throw new Error("Could not prepare that image.");
-
-        context.drawImage(image, 0, 0, canvas.width, canvas.height);
-        URL.revokeObjectURL(objectUrl);
-        resolve(canvas.toDataURL("image/jpeg", 0.88));
-      } catch (error) {
-        URL.revokeObjectURL(objectUrl);
-        reject(error);
-      }
-    };
-
-    image.onerror = () => {
-      URL.revokeObjectURL(objectUrl);
-      reject(new Error("Could not read that image. Please try another photo."));
-    };
-
-    image.src = objectUrl;
+    const reader = new FileReader();
+    reader.onload = () => typeof reader.result === "string"
+      ? resolve(reader.result)
+      : reject(new Error("Could not prepare that image."));
+    reader.onerror = () => reject(new Error("Could not prepare that image."));
+    reader.readAsDataURL(blob);
   });
+}
+
+function dataUrlToBlob(dataUrl) {
+  const match = dataUrl.match(/^data:(image\/[^;]+);base64,(.+)$/s);
+  if (!match) throw new Error("This photo could not be prepared for analysis. Please upload it again.");
+
+  const binary = window.atob(match[2]);
+  const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  return new Blob([bytes], { type: match[1] });
 }
 
 export default function HomePage() {
@@ -96,9 +132,6 @@ export default function HomePage() {
   const [friendCommentDrafts, setFriendCommentDrafts] = useState({});
   const [friendHoverRatings, setFriendHoverRatings] = useState({});
   const [pendingActions, setPendingActions] = useState({});
-  const [savedOutfits, setSavedOutfits] = useState([]);
-  const [savedStatus, setSavedStatus] = useState("loading");
-  const [savedError, setSavedError] = useState("");
   const [recommended, setRecommended] = useState([]);
   const [recommendedStatus, setRecommendedStatus] = useState("loading");
   const [settingsDraft, setSettingsDraft] = useState(null);
@@ -138,9 +171,8 @@ export default function HomePage() {
   const isStyleGuideView = activeTab === "Style Guide";
   const isCameraView = activeTab === "Camera";
   const isFriendsView = activeTab === "Friends";
-  const isSavedView = activeTab === "Saved";
   // The hero/recommendations page. No nav item opens it right now; it shows when no other tab is active.
-  const isHomeView = !isStyleGuideView && !isFriendsView && !isSavedView && !isHistoryView && !isCameraView;
+  const isHomeView = !isStyleGuideView && !isFriendsView && !isHistoryView && !isCameraView;
   const isPhotoCountdownActive = countdownRemaining !== null && photoCountdownTimerRef.current !== null;
   const unreadNotificationCount = notifications.filter((notification) => !notification.read).length;
 
@@ -216,26 +248,6 @@ export default function HomePage() {
 
     return () => controller.abort();
   }, [friendsScope, isFriendsView]);
-
-  // Saved outfits: refetch each time the Saved tab opens. (Status starts at "loading", so no synchronous setState here.)
-  useEffect(() => {
-    if (!isSavedView && !isHomeView) return undefined;
-
-    const controller = new AbortController();
-    api("/users/me/saved?limit=50", { signal: controller.signal })
-      .then(({ outfits = [] }) => {
-        setSavedOutfits(outfits);
-        setSavedError("");
-        setSavedStatus("success");
-      })
-      .catch((error) => {
-        if (controller.signal.aborted) return;
-        setSavedError(describeError(error));
-        setSavedStatus("error");
-      });
-
-    return () => controller.abort();
-  }, [isSavedView, isHomeView]);
 
   // Home recommendations: top-rated outfits, or the newest ones if nothing has been rated yet.
   useEffect(() => {
@@ -318,39 +330,6 @@ export default function HomePage() {
       } catch (error) {
         setFollowed(!next);
         setFriendsError(describeError(error));
-      }
-    });
-  }
-
-  // Save / unsave an outfit from the Friends feed.
-  function toggleSaveOutfit(outfit) {
-    const next = !outfit.saved;
-    const setSaved = (value) => setFriends((current) => current.map((o) => (
-      o.id === outfit.id ? { ...o, saved: value } : o
-    )));
-    return runOnce(`save-${outfit.id}`, async () => {
-      setSaved(next);
-      try {
-        await api(`/outfits/${outfit.id}/save`, { method: next ? "POST" : "DELETE" });
-        setFriendsError("");
-      } catch (error) {
-        setSaved(!next);
-        setFriendsError(describeError(error));
-      }
-    });
-  }
-
-  // Remove an outfit from the Saved tab.
-  function removeSavedOutfit(outfit) {
-    return runOnce(`save-${outfit.id}`, async () => {
-      const before = savedOutfits;
-      setSavedOutfits((current) => current.filter((o) => o.id !== outfit.id));
-      try {
-        await api(`/outfits/${outfit.id}/save`, { method: "DELETE" });
-        setSavedError("");
-      } catch (error) {
-        setSavedOutfits(before);
-        setSavedError(describeError(error));
       }
     });
   }
@@ -722,7 +701,7 @@ export default function HomePage() {
     }
 
     try {
-      const photoData = await resizeImageFile(file);
+      const photoData = await blobToDataUrl(await resizeImageFile(file));
       setOutfitPhoto(photoData);
       setCameraStarted(false);
       setCameraStatus("idle");
@@ -738,18 +717,15 @@ export default function HomePage() {
     const normalizedTargetStyle = targetStyle.trim();
     if (!capturedFit || !normalizedTargetStyle) return;
 
-    const dataUrlMatch = capturedFit.match(/^data:(image\/[^;]+);base64,(.+)$/s);
-    if (!dataUrlMatch) {
-      setAnalysisError("This photo could not be prepared for analysis. Please upload it again.");
-      setAnalysisStatus("error");
-      return;
-    }
-
     setAnalysisStatus("loading");
     setAnalysisError("");
     setAnalysisResult(null);
     try {
-      const thumbnail = await makeThumbnail(capturedFit);
+      const resizedPhoto = await blobToDataUrl(await resizeImageFile(dataUrlToBlob(capturedFit)));
+      const dataUrlMatch = resizedPhoto.match(/^data:(image\/[^;]+);base64,(.+)$/s);
+      if (!dataUrlMatch) throw new Error("This photo could not be prepared for analysis. Please upload it again.");
+
+      const thumbnail = await makeThumbnail(resizedPhoto);
       const result = await api.analyzeFit({
         image: dataUrlMatch[2],
         mimeType: dataUrlMatch[1],
@@ -969,57 +945,6 @@ export default function HomePage() {
               </section>
             )}
           </section>
-        ) : isSavedView ? (
-          <section className="friends-page" aria-labelledby="saved-heading">
-            <header className="friends-page-header">
-              <p className="mini-label">Your collection</p>
-              <h1 id="saved-heading">Saved</h1>
-              <p>Outfits you bookmarked from the Friends feed.</p>
-            </header>
-            {savedStatus === "loading" && <p className="style-guide-status" role="status">Loading saved outfits…</p>}
-            {savedError && <p className="style-guide-error" role="alert">{savedError}</p>}
-            {savedStatus === "success" && savedOutfits.length === 0 && (
-              <p className="style-guide-status">Nothing saved yet. Tap Save on an outfit in Friends.</p>
-            )}
-            <div className="friends-grid">
-              {savedOutfits.map((outfit) => (
-                <article className="friend-card" key={outfit.id}>
-                  <header className="friend-card-header">
-                    <div className="friend-avatar" aria-hidden="true">{(outfit.author?.username || "??").slice(0, 2).toUpperCase()}</div>
-                    <div>
-                      <h2>{outfit.author?.username || "unknown"}</h2>
-                      <time dateTime={outfit.created_at}>
-                        {new Date(outfit.created_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}
-                      </time>
-                    </div>
-                    <div className="friend-card-actions">
-                      <button
-                        type="button"
-                        className="secondary-btn friend-action"
-                        disabled={Boolean(pendingActions[`save-${outfit.id}`])}
-                        onClick={() => removeSavedOutfit(outfit)}
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  </header>
-                  {outfit.cover_image_url && (
-                    <img className="friend-photo" src={outfit.cover_image_url} alt={`${outfit.author?.username || "Someone"} wearing ${outfit.title}`} />
-                  )}
-                  <div className="friend-card-details">
-                    <h3>{outfit.title}</h3>
-                    <p className="friend-fit-score">
-                      <span>Community rating (1–5)</span>
-                      <strong>
-                        {outfit.rating_count ? `${Number(outfit.rating_avg).toFixed(1)} / 5 (${outfit.rating_count})` : "No ratings yet"}
-                      </strong>
-                    </p>
-                    {outfit.description && <p className="friend-style-worn">{outfit.description}</p>}
-                  </div>
-                </article>
-              ))}
-            </div>
-          </section>
         ) : isFriendsView ? (
           <section className="friends-page" aria-labelledby="friends-heading">
             <header className="friends-page-header">
@@ -1072,15 +997,6 @@ export default function HomePage() {
                             {outfit.author_followed ? "Following" : "Follow"}
                           </button>
                         )}
-                        <button
-                          type="button"
-                          className={outfit.saved ? "secondary-btn friend-action active" : "secondary-btn friend-action"}
-                          aria-pressed={Boolean(outfit.saved)}
-                          disabled={Boolean(pendingActions[`save-${outfit.id}`])}
-                          onClick={() => toggleSaveOutfit(outfit)}
-                        >
-                          {outfit.saved ? "Saved" : "Save"}
-                        </button>
                       </div>
                     </header>
                     {outfit.cover_image_url && (
@@ -1182,9 +1098,6 @@ export default function HomePage() {
                   <button type="button" className="primary-btn" onClick={openCameraPage}>
                     Start styling
                   </button>
-                  <button type="button" className="secondary-btn" onClick={() => setActiveTab("Saved")}>
-                    Saved looks
-                  </button>
                 </div>
               </div>
 
@@ -1247,28 +1160,6 @@ export default function HomePage() {
                   </p>
                 </div>
 
-                <div className="saved-card">
-                  <div className="section-header compact">
-                    <h3>Saved looks</h3>
-                    <span>{String(savedOutfits.length).padStart(2, "0")}</span>
-                  </div>
-
-                  {savedOutfits.length === 0 ? (
-                    <p className="style-guide-status">Nothing saved yet.</p>
-                  ) : (
-                    <ul>
-                      {savedOutfits.slice(0, 4).map((look) => (
-                        <li key={look.id}>
-                          <span className="dot" aria-hidden="true" />
-                          <div>
-                            <strong>{look.title}</strong>
-                            <small>@{look.author?.username}</small>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
               </aside>
             </section>
           </>
@@ -1292,20 +1183,19 @@ export default function HomePage() {
               {pastFits.map((fit) => (
                 <article key={fit.id} className="history-item">
                   {fit.thumbnail ? (
-                    <img className="history-image" src={fit.thumbnail} alt={`${fit.targetStyle} outfit`} />
+                    <img className="history-image" src={fit.thumbnail} alt={`${fit.detectedStyle || "Outfit"} outfit`} />
                   ) : (
                     <div className="history-image" role="img" aria-label="No photo saved" />
                   )}
                   <div className="history-copy">
                     <div className="history-topline">
                       <span>{new Date(fit.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</span>
-                      <span className="tag">{fit.detectedStyle || "style"}</span>
                     </div>
                     <div className="history-rating">
                       <span>Rating</span>
                       <strong>{fit.score === null ? "—" : fit.score.toFixed(1)} / 10</strong>
                     </div>
-                    <h3>{fit.targetStyle}</h3>
+                    <h3>{fit.detectedStyle || "style"}</h3>
                     <p>{fit.verdict}</p>
                   </div>
                 </article>
@@ -1448,6 +1338,22 @@ export default function HomePage() {
                   {cameraSwitchMessage && <p className="camera-switch-message" role="status">{cameraSwitchMessage}</p>}
                 </section>
 
+                {analysisResult?.colors?.length > 0 && !noOutfitDetected && (
+                  <div
+                    className="outfit-color-bar"
+                    role="img"
+                    aria-label={`Outfit color palette: ${analysisResult.colors.join(", ")}`}
+                  >
+                    {analysisResult.colors.slice(0, 4).map((color, index) => (
+                      <span
+                        key={`${color}-${index}`}
+                        style={{ backgroundColor: getColorSwatch(color, index) }}
+                        aria-hidden="true"
+                      />
+                    ))}
+                  </div>
+                )}
+
                 {capturedFit ? (
                   <section className="fit-feedback">
                     <p className="mini-label">After the photo</p>
@@ -1471,43 +1377,6 @@ export default function HomePage() {
                     </form>
                     {analysisStatus === "loading" && <p className="style-guide-status" role="status">Your stylist is taking a look…</p>}
                     {analysisError && <p className="style-guide-error" role="alert">{analysisError}</p>}
-
-                    {analysisResult && (
-                      <div aria-live="polite">
-                        <p className="analysis-verdict">{analysisResult.verdict}</p>
-                        <div className="analysis-chips">
-                          {analysisResult.detectedStyle && <span>Style: {analysisResult.detectedStyle}</span>}
-                          {analysisResult.colors?.map((color) => <span key={color}>{color}</span>)}
-                          {analysisResult.score !== null && <span>{analysisResult.colorsMatch ? "Colors match" : "Colors clash"}</span>}
-                        </div>
-                        {analysisResult.whatsWorking?.length > 0 && (
-                          <>
-                            <h3>What's working</h3>
-                            <ul className="improvement-list">
-                              {analysisResult.whatsWorking.map((point, index) => (
-                                <li key={point}><span>{String(index + 1).padStart(2, "0")}</span><p>{point}</p></li>
-                              ))}
-                            </ul>
-                          </>
-                        )}
-                        {analysisResult.improvements?.length > 0 && (
-                          <>
-                            <h3>Small tweaks</h3>
-                            <ul className="improvement-list">
-                              {analysisResult.improvements.map((point, index) => (
-                                <li key={point}><span>{String(index + 1).padStart(2, "0")}</span><p>{point}</p></li>
-                              ))}
-                            </ul>
-                          </>
-                        )}
-                        {analysisResult.weatherFit?.note && (
-                          <p className="analysis-weather">
-                            {analysisResult.weatherFit.ok === false ? "Weather check: " : "Weather: "}
-                            {analysisResult.weatherFit.note}
-                          </p>
-                        )}
-                      </div>
-                    )}
                   </section>
                 ) : (
                   <div className="fit-feedback fit-feedback-empty">
@@ -1548,11 +1417,10 @@ export default function HomePage() {
                   </div>
                   {!capturedFit && <p>Take a photo of your fit to reveal your style score.</p>}
                   {noOutfitDetected && <p role="status">No outfit detected. Try another photo with your full outfit in view.</p>}
-                  {analysisResult?.verdict ? (
-                    <p>{analysisResult.verdict}</p>
-                  ) : capturedFit ? (
+                  {!analysisResult && capturedFit ? (
                     <p>Enter a target style to get outfit feedback.</p>
                   ) : null}
+                  {analysisResult?.verdict && <p className="analysis-verdict">{analysisResult.verdict}</p>}
                   {analysisResult?.whatsWorking?.length > 0 && (
                     <div className="score-notes">
                       <h3>What’s working</h3>
