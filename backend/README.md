@@ -8,7 +8,7 @@ Express + PostgreSQL (TigerData) API.
 cd backend
 npm install
 copy .env.example .env     # then edit .env: DATABASE_URL and JWT_SECRET
-npm run seed               # optional: demo data (users admin/alice/bob/carla/dev, password: password123)
+npm run seed               # optional: demo accounts and 4 Past Fits for admin (password: password123)
 npm run dev                # http://localhost:4000
 ```
 

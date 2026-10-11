@@ -1,38 +1,3 @@
-export const dummyPastFits = [
-  {
-    id: "FIT-024",
-    date: "Apr 24, 2026",
-    name: "Velvet dusk",
-    styleWorn: "Dark evening tailoring with a velvet accent",
-    rating: 8.6,
-    image: "/photos/leeyjohn_%20IG%20fits.jpg",
-  },
-  {
-    id: "FIT-018",
-    date: "Apr 18, 2026",
-    name: "Café neutral",
-    styleWorn: "Relaxed streetwear in soft, warm neutrals",
-    rating: 9.1,
-    image: "/photos/Oversized%20Streetwear%20Outfit%20for%20Men%20_%20Baggy%20Fashion%20Inspiration.jpg",
-  },
-  {
-    id: "FIT-009",
-    date: "Apr 09, 2026",
-    name: "Studio soft",
-    styleWorn: "Autumn layers with clean, tailored lines",
-    rating: 8.3,
-    image: "/photos/Autumn%20Fits.jpg",
-  },
-  {
-    id: "FIT-031",
-    date: "Mar 31, 2026",
-    name: "Rainy day edit",
-    styleWorn: "Cozy winter layers built for a cool-weather day",
-    rating: 9.4,
-    image: "/photos/Winter%20outfit%20under%20budget.jpg",
-  },
-];
-
 export const dummyFriends = [
   {
     id: "friend-maya",

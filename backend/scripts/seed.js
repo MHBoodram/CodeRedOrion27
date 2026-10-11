@@ -1,9 +1,16 @@
 // Fills the database with demo users, wardrobes, outfits, ratings, comments and events.
 // Usage: npm run seed      (safe to re-run: skips if the demo users already exist)
 require('dotenv').config();
+const configuredDatabaseUrl = process.env.DATABASE_URL;
+const tigerDatabaseUrl = process.env.TIMESCALE_SERVICE_URL;
+if (configuredDatabaseUrl && tigerDatabaseUrl && ['localhost', '127.0.0.1', '::1'].includes(new URL(configuredDatabaseUrl).hostname)) {
+  process.env.DATABASE_URL = tigerDatabaseUrl;
+}
 const bcrypt = require('bcryptjs');
 const db = require('../src/db');
 const { setItems, setTags } = require('../src/lib/outfitQueries');
+const fs = require('fs');
+const path = require('path');
 
 const PASSWORD = 'password123';
 // Outfit cover photos: files in client/public/photos, served by the client at /photos/...
@@ -82,6 +89,71 @@ const comments = [
   [7, 'carla', 'Chelsea boots + chinos = never fails.'],
 ];
 
+const pastFits = [
+  {
+    name: 'Sophisticated evening',
+    score: 8.6,
+    detectedStyle: 'Evening tailoring',
+    verdict: 'Dark evening tailoring with a velvet accent',
+    thumbnail: '/photos/leeyjohn_%20IG%20fits.jpg',
+    createdAt: '2026-04-24T12:00:00.000Z',
+  },
+  {
+    name: 'Café neutral',
+    score: 9.1,
+    detectedStyle: 'Relaxed streetwear',
+    verdict: 'Relaxed streetwear in soft, warm neutrals',
+    thumbnail: '/photos/Oversized%20Streetwear%20Outfit%20for%20Men%20_%20Baggy%20Fashion%20Inspiration.jpg',
+    createdAt: '2026-04-18T12:00:00.000Z',
+  },
+  {
+    name: 'Studio soft',
+    score: 8.3,
+    detectedStyle: 'Autumn tailoring',
+    verdict: 'Autumn layers with clean, tailored lines',
+    thumbnail: '/photos/Autumn%20Fits.jpg',
+    createdAt: '2026-04-09T12:00:00.000Z',
+  },
+  {
+    name: 'Rainy day edit',
+    score: 9.4,
+    detectedStyle: 'Cozy winter layers',
+    verdict: 'Cozy winter layers built for a cool-weather day',
+    thumbnail: '/photos/Winter%20outfit%20under%20budget.jpg',
+    createdAt: '2026-03-31T12:00:00.000Z',
+  },
+];
+
+async function seedAdminPastFits() {
+  const migration = fs.readFileSync(path.join(__dirname, '../../schema-history/002_fit_analyses.sql'), 'utf8');
+  await db.query(migration);
+
+  const { rows: [admin] } = await db.query('SELECT id FROM users WHERE username = $1', ['admin']);
+  let inserted = 0;
+  for (const fit of pastFits) {
+    const result = {
+      score: fit.score,
+      verdict: fit.verdict,
+      detectedStyle: fit.detectedStyle,
+      colors: [],
+      colorsMatch: null,
+      whatsWorking: [],
+      improvements: [],
+      weatherFit: { ok: null, note: '' },
+    };
+    const { rowCount } = await db.query(
+      `INSERT INTO fit_analyses (user_id, score, target_style, result, thumbnail, created_at)
+       SELECT $1, $2, $3, $4::jsonb, $5, $6
+        WHERE NOT EXISTS (
+          SELECT 1 FROM fit_analyses WHERE user_id = $1 AND target_style = $3 AND created_at = $6
+        )`,
+      [admin.id, fit.score, fit.name, JSON.stringify(result), fit.thumbnail, fit.createdAt]
+    );
+    inserted += rowCount;
+  }
+  if (inserted) console.log(`Seeded ${inserted} Past Fits for admin.`);
+}
+
 async function main() {
   const { rows: existingAdmin } = await db.query('SELECT 1 FROM users WHERE username = $1', ['admin']);
   if (!existingAdmin.length) {
@@ -93,6 +165,8 @@ async function main() {
     );
     console.log('Seeded demo login "admin".');
   }
+
+  await seedAdminPastFits();
 
   const { rows: existing } = await db.query('SELECT 1 FROM users WHERE username = ANY($1)', [
     users.map((u) => u.username),

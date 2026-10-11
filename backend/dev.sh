@@ -74,6 +74,32 @@ if [[ -z "$DATABASE_URL" ]]; then
 fi
 export DATABASE_URL
 
+GEMINI_API_KEY="${GEMINI_API_KEY:-$(
+	cd "$BACKEND_DIR"
+	node -e '
+		const fs = require("fs");
+	const dotenv = require("dotenv");
+		const envPath = process.argv[1];
+		if (fs.existsSync(envPath)) {
+			const key = dotenv.parse(fs.readFileSync(envPath, "utf8")).GEMINI_API_KEY;
+			if (key) process.stdout.write(key);
+		}
+	' "$PROJECT_DIR/gemini-service/.env"
+)}"
+GEMINI_MODEL="${GEMINI_MODEL:-$(
+	cd "$BACKEND_DIR"
+	node -e '
+		const fs = require("fs");
+		const dotenv = require("dotenv");
+		const envPath = process.argv[1];
+		if (fs.existsSync(envPath)) {
+			const model = dotenv.parse(fs.readFileSync(envPath, "utf8")).GEMINI_MODEL;
+			if (model) process.stdout.write(model);
+		}
+	' "$PROJECT_DIR/gemini-service/.env"
+)}"
+GEMINI_MODEL="${GEMINI_MODEL:-gemini-3.7-flash}"
+
 cleanup() {
 	kill "$BACKEND_PID" "$CLIENT_PID" 2>/dev/null || true
 	wait "$BACKEND_PID" 2>/dev/null || true
@@ -83,6 +109,7 @@ cleanup() {
 echo "Starting FitCheck API and web client. Press Ctrl+C to stop both."
 (
 	cd "$BACKEND_DIR"
+	export GEMINI_API_KEY GEMINI_MODEL
 	exec npm run dev
 ) &
 BACKEND_PID=$!
