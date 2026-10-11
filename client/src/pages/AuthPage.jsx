@@ -1,7 +1,11 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+<<<<<<< HEAD
 import { api, describeError, saveAuth } from "../api.js";
 import girlLogo from "../assets/Girl(2).svg";
+=======
+import girlLogo from "../assets/Girl(7).svg";
+>>>>>>> 02d5318116ca24e31105e72fb403a70a7c2bba8f
 import "./Auth.css";
 
 function AuthBrand() {
@@ -24,8 +28,36 @@ export default function AuthPage({ mode }) {
     const formData = new FormData(form);
     setMessage("");
 
+<<<<<<< HEAD
     if (isSignup && formData.get("password") !== formData.get("confirm_password")) {
       setMessage("Those passwords do not match.");
+=======
+    if (isSignup) {
+      if (formData.get("password") !== formData.get("confirm_password")) {
+        setMessage("Those passwords do not match.");
+        return;
+      }
+
+      const username = formData.get("username").trim();
+      const displayName = formData.get("display_name")?.trim() || null;
+      const user = {
+        name: displayName || username,
+        email: formData.get("email").trim().toLowerCase(),
+        username,
+        display_name: displayName,
+        avatar_url: formData.get("avatar_url")?.trim() || null,
+        bio: formData.get("bio")?.trim() || null,
+      };
+
+      if (!saveUser(user)) {
+        setMessage("Could not save your profile in this browser.");
+        return;
+      }
+
+      setMessage("Profile saved on this browser. Your password was not stored.");
+      event.currentTarget.reset();
+      navigate("/home");
+>>>>>>> 02d5318116ca24e31105e72fb403a70a7c2bba8f
       return;
     }
 
