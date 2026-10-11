@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import girlLogo from "../../../Girl(2).svg";
+import girlLogo from "../assets/Girl(2).svg";
 import "./SignIn.css";
 
 function BrandMark() {

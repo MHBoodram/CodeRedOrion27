@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import girlLogo from "../../../Girl(2).svg";
+import girlLogo from "../assets/Girl(2).svg";
 import "./Auth.css";
 
 const USER_STORAGE_KEY = "fitcheck-user";
@@ -32,24 +32,6 @@ function AuthBrand() {
   );
 }
 
-function ProfileFields() {
-  return (
-    <details className="profile-fields">
-      <summary>Add profile details <span>(optional)</span></summary>
-      <div className="profile-fields-list">
-        <label htmlFor="display-name">Display name</label>
-        <input id="display-name" name="display_name" autoComplete="name" />
-
-        <label htmlFor="avatar-url">Avatar URL</label>
-        <input id="avatar-url" name="avatar_url" type="url" placeholder="https://" />
-
-        <label htmlFor="bio">Style bio</label>
-        <textarea id="bio" name="bio" rows="3" />
-      </div>
-    </details>
-  );
-}
-
 export default function AuthPage({ mode }) {
   const isSignup = mode === "signup";
   const [message, setMessage] = useState("");
@@ -66,14 +48,14 @@ export default function AuthPage({ mode }) {
       }
 
       const username = formData.get("username").trim();
-      const displayName = formData.get("display_name").trim();
+      const displayName = formData.get("display_name")?.trim() || null;
       const user = {
         name: displayName || username,
         email: formData.get("email").trim().toLowerCase(),
         username,
-        display_name: displayName || null,
-        avatar_url: formData.get("avatar_url").trim() || null,
-        bio: formData.get("bio").trim() || null,
+        display_name: displayName,
+        avatar_url: formData.get("avatar_url")?.trim() || null,
+        bio: formData.get("bio")?.trim() || null,
       };
 
       if (!saveUser(user)) {
@@ -182,7 +164,6 @@ export default function AuthPage({ mode }) {
                 minLength="10"
                 required
               />
-              <ProfileFields />
             </>
           ) : (
             <>
