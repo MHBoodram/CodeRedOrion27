@@ -5,10 +5,14 @@ const { Pool } = require('pg');
 const url = new URL(process.env.DATABASE_URL);
 url.searchParams.delete('sslmode');
 
+// A local Postgres (dev fallback) has no SSL; hosted databases like Tiger need it.
+const isLocal = ['localhost', '127.0.0.1', '::1'].includes(url.hostname);
+
 const pool = new Pool({
   connectionString: url.toString(),
-  ssl: { rejectUnauthorized: process.env.DB_SSL_STRICT === 'true' },
+  ssl: isLocal ? false : { rejectUnauthorized: process.env.DB_SSL_STRICT === 'true' },
   max: 10,
+  connectionTimeoutMillis: 10000,
 });
 
 pool.on('error', (err) => console.error('Unexpected pg pool error', err));

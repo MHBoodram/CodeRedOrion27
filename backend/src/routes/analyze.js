@@ -3,6 +3,7 @@ const { z } = require('zod');
 const { HttpError, validate } = require('../errors');
 const { requireAuth } = require('../middleware/auth');
 const { analyzeOutfit } = require('../lib/gemini');
+const db = require('../db');
  
 const router = express.Router();
  
@@ -28,6 +29,12 @@ const analyzeSchema = z.object({
   image: z.string().transform((s) => s.replace(/^data:[^;]+;base64,/, '')).pipe(z.string().min(100).max(5_000_000)),
   mimeType: z.enum(['image/jpeg', 'image/png', 'image/webp']).default('image/jpeg'),
   targetStyle: z.string().trim().min(1, 'Describe the style you are aiming for.').max(300),
+  // Optional small preview (client downscales to ~256px) stored with the history row.
+  thumbnail: z
+    .string()
+    .regex(/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/)
+    .max(80_000)
+    .optional(),
   weather: z
     .object({
       tempF: z.number().min(-60).max(150),
@@ -40,7 +47,24 @@ const analyzeSchema = z.object({
 // This route is mounted BEFORE the global 1 MB JSON parser in server.js and sets its own larger limit.
 router.post('/', requireAuth, express.json({ limit: '6mb' }), rateLimit, validate(analyzeSchema), async (req, res) => {
   try {
-    res.json(await analyzeOutfit(req.valid));
+    const { thumbnail, ...input } = req.valid;
+    const result = await analyzeOutfit(input);
+
+    // "No outfit detected" (score null) is not worth keeping. A failed save must not lose the analysis the user waited for.
+    let saved = null;
+    if (result.score !== null) {
+      try {
+        const { rows } = await db.query(
+          `INSERT INTO fit_analyses (user_id, score, target_style, result, thumbnail)
+           VALUES ($1, $2, $3, $4, $5) RETURNING id, created_at`,
+          [req.user.id, result.score, input.targetStyle, JSON.stringify(result), thumbnail || null]
+        );
+        saved = rows[0];
+      } catch (err) {
+        console.error('Could not save fit analysis:', err.message);
+      }
+    }
+    res.json({ ...result, id: saved?.id ?? null, createdAt: saved?.created_at ?? null });
   } catch (err) {
     if (err instanceof HttpError) throw err;
     console.error('Outfit analysis failed:', err);

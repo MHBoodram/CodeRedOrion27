@@ -1,8 +1,11 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import girlLogo from "../assets/Girl(7).svg";
-import { api, describeError, saveAuth } from "../api.js";
+import { describeError } from "../api.js";
+import { useAuth } from "../auth.jsx";
 import "./Auth.css";
+
+const MIN_PASSWORD = 8; // must match the server's registerSchema
 
 function AuthBrand() {
   return (
@@ -12,73 +15,70 @@ function AuthBrand() {
   );
 }
 
+// Turns an API error into a friendly message.
+function friendlyError(error, isSignup) {
+  if (error?.status === 401) return "Invalid username/email or password.";
+  if (error?.status === 409) return "That username or email is already in use.";
+  if (error?.status === 429) return "Too many attempts. Please wait a moment and try again.";
+  if (error?.status === 400) return describeError(error); // field errors from `details`
+  if (error?.status >= 500) return "The server hit a problem. Please try again.";
+  return describeError(error) || (isSignup ? "Could not create your account." : "Could not log you in.");
+}
+
 export default function AuthPage({ mode }) {
   const isSignup = mode === "signup";
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const { login, register } = useAuth();
+
+  // After auth, return to the page the user was trying to open (set by ProtectedRoute), else /home.
+  const destination = location.state?.from || "/home";
 
   async function handleSubmit(event) {
     event.preventDefault();
-    const form = event.currentTarget;
-    const formData = new FormData(form);
+    const formData = new FormData(event.currentTarget);
     setMessage("");
 
-    if (isSignup) {
-      if (formData.get("password") !== formData.get("confirm_password")) {
-        setMessage("Those passwords do not match.");
-        return;
-      }
-
-      const username = formData.get("username").trim();
-      const displayName = formData.get("display_name")?.trim() || null;
-      const user = {
-        name: displayName || username,
-        email: formData.get("email").trim().toLowerCase(),
-        username,
-        display_name: displayName,
-        avatar_url: formData.get("avatar_url")?.trim() || null,
-        bio: formData.get("bio")?.trim() || null,
-      };
-
-      if (!saveUser(user)) {
-        setMessage("Could not save your profile in this browser.");
-        return;
-      }
-
-      setMessage("Profile saved on this browser. Your password was not stored.");
-      event.currentTarget.reset();
-      navigate("/home");
+    if (isSignup && formData.get("password") !== formData.get("confirm_password")) {
+      setMessage("Those passwords do not match.");
       return;
     }
 
     setSubmitting(true);
     try {
-      let session;
       if (isSignup) {
-        const body = {
+        // confirm_password is a client-only check and is never sent.
+        const payload = {
           username: formData.get("username").trim(),
           email: formData.get("email").trim().toLowerCase(),
           password: formData.get("password"),
         };
         const displayName = formData.get("display_name")?.trim();
-        if (displayName) body.display_name = displayName;
-        session = await api("/auth/register", { method: "POST", body, auth: false });
+        if (displayName) payload.display_name = displayName;
+        await register(payload);
       } else {
-        session = await api("/auth/login", {
-          method: "POST",
-          body: {
-            identifier: formData.get("identifier").trim(),
-            password: formData.get("password"),
-          },
-          auth: false,
-        });
+        await login(formData.get("identifier").trim(), formData.get("password"));
       }
-
-      saveAuth(session);
-      navigate("/home");
+      navigate(destination, { replace: true });
     } catch (error) {
-      setMessage(describeError(error));
+      setMessage(friendlyError(error, isSignup));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  // Dev-only shortcut: signs in as the seeded demo user through the REAL API, so you get a
+  // real token and every authed call (feed, analyze) works. Needs `npm run seed` to have run.
+  async function handleDemoLogin() {
+    setMessage("");
+    setSubmitting(true);
+    try {
+      await login("alice", "password123");
+      navigate(destination, { replace: true });
+    } catch (error) {
+      setMessage(`Demo login failed: ${friendlyError(error, false)} (is the backend running and seeded?)`);
     } finally {
       setSubmitting(false);
     }
@@ -112,6 +112,15 @@ export default function AuthPage({ mode }) {
                 required
               />
 
+              <label htmlFor="display-name">Display name (optional)</label>
+              <input
+                id="display-name"
+                name="display_name"
+                type="text"
+                autoComplete="name"
+                maxLength="60"
+              />
+
               <label htmlFor="signup-email">Email address</label>
               <input
                 id="signup-email"
@@ -127,7 +136,9 @@ export default function AuthPage({ mode }) {
                 name="password"
                 type="password"
                 autoComplete="new-password"
-                minLength="10"
+                minLength={MIN_PASSWORD}
+                maxLength="100"
+                title={`At least ${MIN_PASSWORD} characters.`}
                 required
               />
 
@@ -137,7 +148,8 @@ export default function AuthPage({ mode }) {
                 name="confirm_password"
                 type="password"
                 autoComplete="new-password"
-                minLength="10"
+                minLength={MIN_PASSWORD}
+                maxLength="100"
                 required
               />
             </>
@@ -166,9 +178,14 @@ export default function AuthPage({ mode }) {
           <button type="submit" disabled={submitting}>
             {submitting ? "Please wait…" : isSignup ? "Create account" : "Log in"}
           </button>
+          {import.meta.env.DEV && !isSignup && (
+            <button className="auth-demo-admin" type="button" onClick={handleDemoLogin} disabled={submitting}>
+              Continue as demo user (dev only)
+            </button>
+          )}
         </form>
 
-        {message && <p className="auth-message" role="status">{message}</p>}
+        {message && <p className="auth-message" role="alert">{message}</p>}
         <p className="auth-switch">
           {isSignup ? "Already have an account?" : "New to Fit Check?"}{" "}
           <Link to={isSignup ? "/login" : "/signup"}>

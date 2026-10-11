@@ -2,14 +2,16 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import girlLogo from "../assets/Girl(6).svg";
 import WeatherBadge from "../components/WeatherBadge.jsx";
-import { api, clearAuth } from "../api.js";
-import { dummyNotifications, dummyPastFits } from "../data/dummyDatabase.js";
+import { api, describeError } from "../api.js";
+import { useAuth } from "../auth.jsx";
+import { makeThumbnail } from "../Imageutils.js";
+import { dummyNotifications } from "../data/dummyDatabase.js";
 import { requestStyleMoodboard } from "../styleGuideApi.js";
 import "./HomePage.css";
 import "./Analysis.css";
 
-const GEMINI_API_URL = import.meta.env.VITE_GEMINI_API_URL || "http://localhost:3001/api/analyze-outfit";
-const MAX_OUTFIT_IMAGE_EDGE = 1600;
+// Longest edge of any photo we keep or upload. Keeps request bodies small (server limit is 6 MB).
+const MAX_OUTFIT_IMAGE_EDGE = 1024;
 
 const navItems = ["Today's Fit", "Past Fits", "Friends", "Style Guide"];
 
@@ -63,26 +65,6 @@ function getWeatherDescription(code) {
   return "Check local conditions";
 }
 
-function getCurrentUsername() {
-  try {
-    const savedUser = JSON.parse(window.localStorage.getItem("fitcheck-user") || "null");
-    const session = JSON.parse(window.localStorage.getItem("fitcheck-session") || "null");
-    return savedUser?.username || session?.username || savedUser?.name || session?.name || "Guest";
-  } catch {
-    return "Guest";
-  }
-}
-
-function getCurrentEmail() {
-  try {
-    const savedUser = JSON.parse(window.localStorage.getItem("fitcheck-user") || "null");
-    const session = JSON.parse(window.localStorage.getItem("fitcheck-session") || "null");
-    return savedUser?.email || session?.email || "No email saved";
-  } catch {
-    return "No email saved";
-  }
-}
-
 function resizeImageFile(file) {
   return new Promise((resolve, reject) => {
     const objectUrl = URL.createObjectURL(file);
@@ -116,8 +98,9 @@ function resizeImageFile(file) {
 }
 
 export default function HomePage() {
-  const username = getCurrentUsername();
-  const email = getCurrentEmail();
+  const { user, logout } = useAuth();
+  const username = user?.username || "Guest";
+  const email = user?.email || "";
   const usernameInitials = username.slice(0, 2).toUpperCase();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("Camera");
@@ -126,7 +109,7 @@ export default function HomePage() {
   const [styleGuideStatus, setStyleGuideStatus] = useState("idle");
   const [styleGuideError, setStyleGuideError] = useState("");
   const [friends, setFriends] = useState([]);
-  const [friendsScope, setFriendsScope] = useState("following");
+  const [friendsScope, setFriendsScope] = useState("all");
   const [friendsStatus, setFriendsStatus] = useState("idle");
   const [friendsError, setFriendsError] = useState("");
   const [friendComments, setFriendComments] = useState({});
@@ -148,6 +131,9 @@ export default function HomePage() {
   const [analysisResult, setAnalysisResult] = useState(null);
   const [analysisStatus, setAnalysisStatus] = useState("idle");
   const [analysisError, setAnalysisError] = useState("");
+  const [pastFits, setPastFits] = useState([]);
+  const [pastFitsStatus, setPastFitsStatus] = useState("idle");
+  const [pastFitsError, setPastFitsError] = useState("");
   const videoRef = useRef(null);
   const photoInputRef = useRef(null);
   const cameraStreamRef = useRef(null);
@@ -164,15 +150,37 @@ export default function HomePage() {
   const isFriendsView = activeTab === "Friends";
   const isPhotoCountdownActive = countdownRemaining !== null && photoCountdownTimerRef.current !== null;
   const unreadNotificationCount = notifications.filter((notification) => !notification.read).length;
-  const fitRatingOutOfFive = typeof analysisResult?.score === "number"
-    ? Math.max(0, Math.min(5, analysisResult.score / 2))
-    : null;
+  const fitScore = typeof analysisResult?.score === "number" ? analysisResult.score : null;
+  const noOutfitDetected = analysisResult !== null && analysisResult.score === null;
+
+  // Reload history every time the Past Fits tab opens, so a fit analyzed a moment ago is always there.
+  useEffect(() => {
+    if (!isHistoryView) return undefined;
+
+    const controller = new AbortController();
+    setPastFitsStatus("loading");
+    setPastFitsError("");
+    api
+      .fits({ limit: 50, signal: controller.signal })
+      .then(({ fits = [] }) => {
+        setPastFits(fits);
+        setPastFitsStatus("success");
+      })
+      .catch((error) => {
+        if (error?.name === "AbortError") return;
+        setPastFitsError(describeError(error));
+        setPastFitsStatus("error");
+      });
+    return () => controller.abort();
+  }, [isHistoryView]);
 
   useEffect(() => {
     if (!isFriendsView) return undefined;
 
     const controller = new AbortController();
     const query = new URLSearchParams({ sort: "recent", scope: friendsScope, limit: "20" });
+    setFriendsStatus("loading");
+    setFriendsError("");
 
     api(`/outfits?${query}`, { signal: controller.signal })
       .then(async ({ outfits = [] }) => {
@@ -307,6 +315,17 @@ export default function HomePage() {
 
   useEffect(() => () => window.clearTimeout(photoCountdownTimerRef.current), []);
 
+  function openFriendsView() {
+    setActiveTab("Friends");
+  }
+
+  function changeFriendsScope(scope) {
+    if (scope === friendsScope) return;
+    setFriends([]);
+    setFriendComments({});
+    setFriendsScope(scope);
+  }
+
   function openCameraPage() {
     setCameraError("");
     setCameraSwitchMessage("");
@@ -422,11 +441,8 @@ export default function HomePage() {
   }
 
   function handleLogout() {
-    try {
-      clearAuth();
-    } finally {
-      navigate("/login");
-    }
+    logout();
+    navigate("/login");
   }
 
   async function handleStyleGuideSubmit(event) {
@@ -571,23 +587,20 @@ export default function HomePage() {
     setAnalysisError("");
     setAnalysisResult(null);
     try {
-      const result = await api("/analyze-outfit", {
-        method: "POST",
-        body: {
-          image: dataUrlMatch[2],
-          mimeType: dataUrlMatch[1],
-          targetStyle: normalizedTargetStyle,
-          weather: currentWeather
-            ? { tempF: currentWeather.tempF, description: currentWeather.description }
-            : undefined,
-        },
+      const thumbnail = await makeThumbnail(capturedFit);
+      const result = await api.analyzeFit({
+        image: dataUrlMatch[2],
+        mimeType: dataUrlMatch[1],
+        targetStyle: normalizedTargetStyle,
+        thumbnail: thumbnail || undefined,
+        weather: currentWeather
+          ? { tempF: currentWeather.tempF, description: currentWeather.description }
+          : undefined,
       });
       setAnalysisResult(result);
       setAnalysisStatus("success");
     } catch (error) {
-      setAnalysisError(error instanceof Error
-        ? error.message
-        : "Could not reach Gemini. Check that the Gemini service is running.");
+      setAnalysisError(describeError(error) || "Could not analyze this photo. Please try again.");
       setAnalysisStatus("error");
     }
   }
@@ -790,7 +803,6 @@ export default function HomePage() {
             <header className="friends-page-header">
               <p className="mini-label">Community</p>
               <h1 id="friends-heading">Friends</h1>
-              <p>See what your friends are wearing and share your take.</p>
               <p>See what your friends are wearing today and share your take.</p>
             </header>
             <div className="friends-scope" role="group" aria-label="Choose a feed">
@@ -811,10 +823,11 @@ export default function HomePage() {
               </p>
             )}
             <div className="friends-grid">
-              {dummyFriends.map((friend) => {
-                const feedback = friendFeedback[friend.id] || {};
-                const comments = [...friend.comments, ...(feedback.comments || [])];
-                const displayedRating = friendHoverRatings[friend.id] ?? feedback.rating ?? 0;
+              {friends.map((outfit) => {
+                const author = outfit.author || { username: "unknown" };
+                const isOwnOutfit = author.username === username;
+                const comments = friendComments[outfit.id] || [];
+                const displayedRating = friendHoverRatings[outfit.id] ?? outfit.my_rating ?? 0;
                 return (
                   <article className="friend-card" key={outfit.id}>
                     <header className="friend-card-header">
@@ -832,9 +845,9 @@ export default function HomePage() {
                     <div className="friend-card-details">
                       <h3>{outfit.title}</h3>
                       <p className="friend-fit-score">
-                        <span>Community rating</span>
+                        <span>Community rating (1–5)</span>
                         <strong>
-                          {outfit.rating_count ? `${outfit.rating_avg.toFixed(1)} / 5 (${outfit.rating_count})` : "No ratings yet"}
+                          {outfit.rating_count ? `${Number(outfit.rating_avg).toFixed(1)} / 5 (${outfit.rating_count})` : "No ratings yet"}
                         </strong>
                       </p>
                       {outfit.description && <p className="friend-style-worn">{outfit.description}</p>}
@@ -847,17 +860,17 @@ export default function HomePage() {
                         <div
                           className="friend-stars"
                           role="group"
-                          aria-label={`Rate ${friend.username} out of five stars`}
+                          aria-label={`Rate ${author.username} out of five stars`}
                           onMouseLeave={() => setFriendHoverRatings((current) => {
                             const next = { ...current };
-                            delete next[friend.id];
+                            delete next[outfit.id];
                             return next;
                           })}
                           onBlur={(event) => {
                             if (!event.currentTarget.contains(event.relatedTarget)) {
                               setFriendHoverRatings((current) => {
                                 const next = { ...current };
-                                delete next[friend.id];
+                                delete next[outfit.id];
                                 return next;
                               });
                             }
@@ -870,10 +883,10 @@ export default function HomePage() {
                               type="button"
                               disabled={isOwnOutfit}
                               aria-label={`${star} ${star === 1 ? "star" : "stars"}`}
-                              aria-pressed={feedback.rating === star}
-                              onMouseEnter={() => setFriendHoverRatings((current) => ({ ...current, [friend.id]: star }))}
-                              onFocus={() => setFriendHoverRatings((current) => ({ ...current, [friend.id]: star }))}
-                              onClick={() => rateFriendFit(friend.id, star)}
+                              aria-pressed={outfit.my_rating === star}
+                              onMouseEnter={() => setFriendHoverRatings((current) => ({ ...current, [outfit.id]: star }))}
+                              onFocus={() => setFriendHoverRatings((current) => ({ ...current, [outfit.id]: star }))}
+                              onClick={() => rateFriendFit(outfit.id, star)}
                             >
                               &#9733;
                             </button>
@@ -1016,21 +1029,31 @@ export default function HomePage() {
            
             </div>
 
+            {pastFitsStatus === "loading" && <p className="style-guide-status" role="status">Loading your fits…</p>}
+            {pastFitsStatus === "error" && <p className="style-guide-error" role="alert">{pastFitsError}</p>}
+            {pastFitsStatus === "success" && pastFits.length === 0 && (
+              <p className="style-guide-status">No fits yet. Take your first photo on Today's Fit!</p>
+            )}
+
             <div className="history-list">
-              {dummyPastFits.map((fit) => (
+              {pastFits.map((fit) => (
                 <article key={fit.id} className="history-item">
-                  <img className="history-image" src={fit.image} alt={`${fit.name} outfit`} />
+                  {fit.thumbnail ? (
+                    <img className="history-image" src={fit.thumbnail} alt={`${fit.targetStyle} outfit`} />
+                  ) : (
+                    <div className="history-image" role="img" aria-label="No photo saved" />
+                  )}
                   <div className="history-copy">
                     <div className="history-topline">
-                      <span>{fit.date}</span>
-                      <span className="tag">{fit.id}</span>
+                      <span>{new Date(fit.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</span>
+                      <span className="tag">{fit.detectedStyle || "style"}</span>
                     </div>
                     <div className="history-rating">
                       <span>Rating</span>
-                      <strong>{fit.rating.toFixed(1)} / 10</strong>
+                      <strong>{fit.score === null ? "—" : fit.score.toFixed(1)} / 10</strong>
                     </div>
-                    <h3>{fit.name}</h3>
-                    <p>{fit.styleWorn}</p>
+                    <h3>{fit.targetStyle}</h3>
+                    <p>{fit.verdict}</p>
                   </div>
                 </article>
               ))}
@@ -1168,21 +1191,10 @@ export default function HomePage() {
                         {isPhotoCountdownActive ? "Cancel countdown" : "Take fit photo"}
                       </button>
                     ) : null}
-                    <span>Your photo is only sent when you tap Analyze, and it is not stored.</span>
+                    <span>Your photo is only sent when you tap Analyze. It goes to our server and Google Gemini; only a small preview is saved to your Past Fits.</span>
                   </div>
                   {cameraSwitchMessage && <p className="camera-switch-message" role="status">{cameraSwitchMessage}</p>}
                 </section>
-
-                {analysisResult?.colors?.filter((color) => /^#[\da-f]{6}$/i.test(color)).slice(0, 4).length > 0 && (
-                  <div className="outfit-color-bar" role="img" aria-label="Outfit color palette">
-                    {analysisResult.colors
-                      .filter((color) => /^#[\da-f]{6}$/i.test(color))
-                      .slice(0, 4)
-                      .map((color, index) => (
-                        <span key={`${color}-${index}`} style={{ backgroundColor: color }} aria-hidden="true" />
-                      ))}
-                  </div>
-                )}
 
                 {capturedFit ? (
                   <section className="fit-feedback">
@@ -1279,10 +1291,11 @@ export default function HomePage() {
                 <section className="rating-card">
                   <p className="mini-label">Your style score</p>
                   <div className="rating-row">
-                    <strong>{fitRatingOutOfFive === null ? "—" : fitRatingOutOfFive.toFixed(1)}</strong>
-                    <span>/ 5</span>
+                    <strong>{fitScore === null ? "—" : fitScore.toFixed(1)}</strong>
+                    <span>/ 10</span>
                   </div>
-                  <p>{capturedFit ? "Sample editorial score; photo-based outfit analysis is not connected yet." : "Take a photo of your fit to reveal your style score."}</p>
+                  {!capturedFit && <p>Take a photo of your fit to reveal your style score.</p>}
+                  {noOutfitDetected && <p role="status">No outfit detected. Try another photo with your full outfit in view.</p>}
                   {analysisResult?.verdict ? (
                     <p>{analysisResult.verdict}</p>
                   ) : capturedFit ? (
@@ -1307,15 +1320,12 @@ export default function HomePage() {
                     <div>
                       <p className="mini-label">What is your fit giving?</p>
                       <h2>Similar styles</h2>
-                      <p className="mini-label">What's your fit giving?</p>
-                      {analysisResult?.fitGiving?.vibe && <h2>{analysisResult.fitGiving.vibe}</h2>}
                     </div>
                   </div>
-                  {analysisResult?.fitGiving?.closestStyle ? (
+                  {analysisResult?.detectedStyle && !noOutfitDetected ? (
                     <div className="gemini-style-match">
                       <p className="mini-label">Closest style match</p>
-                      <h3>{analysisResult.fitGiving.closestStyle}</h3>
-                      {analysisResult.fitGiving.reason && <p>{analysisResult.fitGiving.reason}</p>}
+                      <h3>{analysisResult.detectedStyle}</h3>
                     </div>
                   ) : null}
                 </section>
