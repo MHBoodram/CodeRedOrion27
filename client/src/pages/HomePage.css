@@ -1113,21 +1113,6 @@
   padding: 12px;
 }
 
-<<<<<<< HEAD
-.friend-avatar {
-  display: grid;
-  width: 38px;
-  height: 38px;
-  flex: 0 0 38px;
-  place-items: center;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--lilac-ash), #d7c2d0);
-  color: var(--bg-deep);
-  font-weight: 700;
-}
-
-=======
->>>>>>> f013c8724235d03b73a7965efc685ee608758a57
 .friend-card-header h2 {
   margin: 0;
   color: var(--text);
@@ -1216,10 +1201,7 @@
   font: inherit;
   font-size: 1.55rem;
   line-height: 1;
-<<<<<<< HEAD
-=======
   transition: color 120ms ease;
->>>>>>> f013c8724235d03b73a7965efc685ee608758a57
 }
 
 .friend-star.selected {
@@ -1456,8 +1438,6 @@
   background: rgba(255, 255, 255, 0.02);
 }
 
-<<<<<<< HEAD
-=======
 .outfit-color-bar {
   display: flex;
   width: 100%;
@@ -1472,7 +1452,6 @@
   flex: 1 1 0;
 }
 
->>>>>>> f013c8724235d03b73a7965efc685ee608758a57
 .camera-source-prompt {
   margin: 0 0 14px;
   color: var(--text);
@@ -1545,8 +1524,6 @@
   gap: 12px;
 }
 
-<<<<<<< HEAD
-=======
 .camera-start-actions button {
   min-width: 154px;
   border: 1px solid rgba(255, 255, 255, 0.32);
@@ -1572,7 +1549,6 @@
   filter: brightness(0.96);
 }
 
->>>>>>> f013c8724235d03b73a7965efc685ee608758a57
 .camera-video,
 .captured-image {
   position: absolute;
@@ -2154,14 +2130,11 @@
     grid-template-columns: 1fr;
   }
 
-<<<<<<< HEAD
-=======
   .target-style-fields,
   .gemini-result-columns {
     grid-template-columns: 1fr;
   }
 
->>>>>>> f013c8724235d03b73a7965efc685ee608758a57
   .style-guide-heading h1 {
     font-size: 2rem;
   }

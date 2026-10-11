@@ -6,12 +6,9 @@ import { dummyFriends, dummyNotifications, dummyPastFits } from "../data/dummyDa
 import { requestStyleMoodboard } from "../styleGuideApi.js";
 import "./HomePage.css";
 
-<<<<<<< HEAD
-=======
 const GEMINI_API_URL = import.meta.env.VITE_GEMINI_API_URL || "http://localhost:3001/api/analyze-outfit";
 const MAX_OUTFIT_IMAGE_EDGE = 1600;
 
->>>>>>> f013c8724235d03b73a7965efc685ee608758a57
 const navItems = ["Today's Fit", "Past Fits", "Friends", "Style Guide"];
 
 const recommendations = [
@@ -47,14 +44,11 @@ const savedLooks = [
   { name: "City minimal", time: "3d ago" },
 ];
 
-<<<<<<< HEAD
 const similarStyles = [
   { name: "Warm tailorinong", detail: "Soft structure · earthy tones", image: recommendations[0].image },
   { name: "Modern romantic", detail: "Fluid layers · muted accents", image: recommendations[2].image },
 ];
 
-=======
->>>>>>> f013c8724235d03b73a7965efc685ee608758a57
 function getWeatherDescription(code) {
   if (code === 0) return "Clear skies";
   if ([1, 2].includes(code)) return "Partly cloudy";
@@ -87,8 +81,6 @@ function getCurrentEmail() {
   }
 }
 
-<<<<<<< HEAD
-=======
 function resizeImageFile(file) {
   return new Promise((resolve, reject) => {
     const objectUrl = URL.createObjectURL(file);
@@ -121,7 +113,6 @@ function resizeImageFile(file) {
   });
 }
 
->>>>>>> f013c8724235d03b73a7965efc685ee608758a57
 export default function HomePage() {
   const username = getCurrentUsername();
   const friendFeedbackKey = `fitcheck-friend-feedback:${username}`;
@@ -141,10 +132,7 @@ export default function HomePage() {
     }
   });
   const [friendCommentDrafts, setFriendCommentDrafts] = useState({});
-<<<<<<< HEAD
-=======
   const [friendHoverRatings, setFriendHoverRatings] = useState({});
->>>>>>> f013c8724235d03b73a7965efc685ee608758a57
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isNotificationMenuOpen, setIsNotificationMenuOpen] = useState(false);
@@ -173,12 +161,9 @@ export default function HomePage() {
   const isCameraView = activeTab === "Camera";
   const isFriendsView = activeTab === "Friends";
   const unreadNotificationCount = notifications.filter((notification) => !notification.read).length;
-<<<<<<< HEAD
-=======
   const fitRatingOutOfFive = typeof analysisResult?.score === "number"
     ? Math.max(0, Math.min(5, analysisResult.score / 2))
     : null;
->>>>>>> f013c8724235d03b73a7965efc685ee608758a57
 
   useEffect(() => {
     try {
@@ -286,8 +271,6 @@ export default function HomePage() {
     setActiveTab("Camera");
   }
 
-<<<<<<< HEAD
-=======
   function resetStyleAnalysis() {
     setTargetStyle("");
     setAnalysisResult(null);
@@ -300,7 +283,6 @@ export default function HomePage() {
     resetStyleAnalysis();
   }
 
->>>>>>> f013c8724235d03b73a7965efc685ee608758a57
   async function startCamera() {
     setCameraError("");
     setCameraStatus("loading");
@@ -352,10 +334,7 @@ export default function HomePage() {
     setCameraError("");
     setCameraStarted(false);
     setCameraStatus("idle");
-<<<<<<< HEAD
-=======
     resetStyleAnalysis();
->>>>>>> f013c8724235d03b73a7965efc685ee608758a57
   }
 
   function backToPhotoChoices() {
@@ -702,11 +681,8 @@ export default function HomePage() {
                   className="style-guide-input"
                   value={stylePrompt}
                   onChange={(event) => setStylePrompt(event.target.value)}
-<<<<<<< HEAD
                   placeholder="e.g. relaxed autumn streetwear in warm neutrals"
-=======
                   placeholder="e.g. streetwear, gothic, bohemian"
->>>>>>> f013c8724235d03b73a7965efc685ee608758a57
                   maxLength={120}
                   required
                 />
@@ -770,27 +746,21 @@ export default function HomePage() {
             <header className="friends-page-header">
               <p className="mini-label">Community</p>
               <h1 id="friends-heading">Friends</h1>
-<<<<<<< HEAD
               <p>See what your friends are wearing and share your take.</p>
-=======
               <p>See what your friends are wearing today and share your take.</p>
->>>>>>> f013c8724235d03b73a7965efc685ee608758a57
             </header>
             <div className="friends-grid">
               {dummyFriends.map((friend) => {
                 const feedback = friendFeedback[friend.id] || {};
                 const comments = [...friend.comments, ...(feedback.comments || [])];
-<<<<<<< HEAD
                 return (
                   <article className="friend-card" key={friend.id}>
                     <header className="friend-card-header">
                       <div className="friend-avatar" aria-hidden="true">{friend.username.slice(0, 2).toUpperCase()}</div>
-=======
                 const displayedRating = friendHoverRatings[friend.id] ?? feedback.rating ?? 0;
                 return (
                   <article className="friend-card" key={friend.id}>
                     <header className="friend-card-header">
->>>>>>> f013c8724235d03b73a7965efc685ee608758a57
                       <div>
                         <h2>{friend.username}</h2>
                         <time>{friend.postedAt}</time>
@@ -799,11 +769,8 @@ export default function HomePage() {
                     <img className="friend-photo" src={friend.photo} alt={`${friend.username} wearing ${friend.fitName}`} />
                     <div className="friend-card-details">
                       <h3>{friend.fitName}</h3>
-<<<<<<< HEAD
                       <p className="friend-fit-score"><span>Fit score</span><strong>{friend.fitScore.toFixed(1)} / 10</strong></p>
-=======
                       <p className="friend-fit-score"><span>Fit score</span><strong>{friend.fitScore.toFixed(1)} / 5</strong></p>
->>>>>>> f013c8724235d03b73a7965efc685ee608758a57
                       <p className="friend-style-worn">{friend.styleWorn}</p>
 
                       <section className="friend-rating-section" aria-label={`Rate ${friend.username}'s outfit`}>
@@ -811,12 +778,10 @@ export default function HomePage() {
                           <span>Your rating</span>
                           <output>{feedback.rating ? `${feedback.rating} / 5` : "Not rated"}</output>
                         </div>
-<<<<<<< HEAD
                         <div className="friend-stars" role="group" aria-label={`Rate ${friend.username} out of five stars`}>
                           {[1, 2, 3, 4, 5].map((star) => (
                             <button
                               className={`friend-star${feedback.rating >= star ? " selected" : ""}`}
-=======
                         <div
                           className="friend-stars"
                           role="group"
@@ -839,16 +804,12 @@ export default function HomePage() {
                           {[1, 2, 3, 4, 5].map((star) => (
                             <button
                               className={`friend-star${displayedRating >= star ? " selected" : ""}`}
->>>>>>> f013c8724235d03b73a7965efc685ee608758a57
                               key={star}
                               type="button"
                               aria-label={`${star} ${star === 1 ? "star" : "stars"}`}
                               aria-pressed={feedback.rating === star}
-<<<<<<< HEAD
-=======
                               onMouseEnter={() => setFriendHoverRatings((current) => ({ ...current, [friend.id]: star }))}
                               onFocus={() => setFriendHoverRatings((current) => ({ ...current, [friend.id]: star }))}
->>>>>>> f013c8724235d03b73a7965efc685ee608758a57
                               onClick={() => rateFriendFit(friend.id, star)}
                             >
                               &#9733;
@@ -1197,9 +1158,7 @@ export default function HomePage() {
                     <strong>{fitRatingOutOfFive === null ? "—" : fitRatingOutOfFive.toFixed(1)}</strong>
                     <span>/ 5</span>
                   </div>
-<<<<<<< HEAD
                   <p>{capturedFit ? "Sample editorial score; photo-based outfit analysis is not connected yet." : "Take a photo of your fit to reveal your style score."}</p>
-=======
                   {analysisResult?.verdict ? (
                     <p>{analysisResult.verdict}</p>
                   ) : capturedFit ? (
@@ -1217,19 +1176,15 @@ export default function HomePage() {
                       <ul>{analysisResult.improvements.map((item, index) => <li key={`improvement-${index}`}>{item}</li>)}</ul>
                     </div>
                   )}
->>>>>>> f013c8724235d03b73a7965efc685ee608758a57
                 </section>
 
                 <section className="similar-card">
                   <div className="camera-card-heading">
                     <div>
-<<<<<<< HEAD
                       <p className="mini-label">What is your fit giving?</p>
                       <h2>Similar styles</h2>
-=======
                       <p className="mini-label">What's your fit giving?</p>
                       {analysisResult?.fitGiving?.vibe && <h2>{analysisResult.fitGiving.vibe}</h2>}
->>>>>>> f013c8724235d03b73a7965efc685ee608758a57
                     </div>
                   </div>
                   {analysisResult?.fitGiving?.closestStyle ? (
