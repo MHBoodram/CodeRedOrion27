@@ -174,6 +174,41 @@ const FAKE_IMG = 'A'.repeat(400); // valid base64 shape; Gemini never sees it un
     }
   }
 
+  step('Level 9: follow and save');
+  const authorName = target?.author?.username;
+  if (!target || !authorName) skip('no outfit with an author to follow/save');
+  else {
+    const feedOf = async (t) => (await call('/api/outfits?scope=all&limit=50', { token: t })).data?.outfits?.find((o) => o.id === target.id);
+    const before = await feedOf(token);
+    check(before?.author_followed === false && before?.saved === false, 'feed starts with author_followed=false and saved=false', JSON.stringify({ f: before?.author_followed, s: before?.saved }));
+    check((await call(`/api/users/${authorName}/follow`, { method: 'POST', token })).status === 200, 'following the author works');
+    check((await feedOf(token))?.author_followed === true, 'feed shows author_followed=true after following ("refresh")');
+    check((await call('/api/users/me/saved')).status === 401, 'GET /users/me/saved without a token is 401');
+    check((await call(`/api/outfits/${target.id}/save`, { method: 'POST', token })).status === 200, 'saving an outfit works');
+    await call(`/api/outfits/${target.id}/save`, { method: 'POST', token }); // saving twice must not duplicate
+    const saved = await call('/api/users/me/saved', { token });
+    check(saved.data?.outfits?.filter((o) => o.id === target.id).length === 1, 'saved list has the outfit exactly once');
+    check((await feedOf(token))?.saved === true, 'feed shows saved=true after saving');
+    check((await call('/api/outfits/00000000-0000-4000-8000-000000000000/save', { method: 'POST', token })).status === 404, 'saving a missing outfit is 404');
+    await call(`/api/outfits/${target.id}/save`, { method: 'DELETE', token });
+    check(((await call('/api/users/me/saved', { token })).data?.outfits || []).every((o) => o.id !== target.id), 'unsaving removes it from the saved list');
+    await call(`/api/users/${authorName}/follow`, { method: 'DELETE', token });
+    check((await feedOf(token))?.author_followed === false, 'unfollowing flips author_followed back to false');
+  }
+
+  step('Level 9: account settings');
+  const patch = (t, body) => call('/api/users/me', { method: 'PATCH', token: t, body });
+  check((await patch(undefined, { bio: 'x' })).status === 401, 'PATCH /users/me without a token is 401');
+  check((await patch(token, {})).status === 400, 'empty update is 400');
+  check((await patch(token, { display_name: '' })).status === 400, 'empty display name is 400');
+  check((await patch(token, { avatar_url: 'not a url' })).status === 400, 'invalid avatar URL is 400');
+  const upd = await patch(token, { display_name: 'Verify Renamed', bio: 'hello from verify', avatar_url: 'https://example.com/a.png' });
+  check(upd.status === 200 && upd.data?.user?.display_name === 'Verify Renamed', 'updating profile works', JSON.stringify(upd.data));
+  const meAfter = await call('/api/auth/me', { token });
+  check(meAfter.data?.user?.bio === 'hello from verify' && meAfter.data.user.avatar_url === 'https://example.com/a.png', 'changes are still there after a re-fetch ("refresh")');
+  const cleared = await patch(token, { avatar_url: '' });
+  check(cleared.status === 200 && cleared.data?.user?.avatar_url === null && cleared.data.user.display_name === 'Verify Renamed', 'empty avatar URL clears it without touching other fields', JSON.stringify(cleared.data));
+
   // cleanup: throwaway users cascade-delete their fits, ratings and comments
   const del = await db.query("DELETE FROM users WHERE username LIKE 'verify\\_%'");
   console.log(`\n(cleaned up ${del.rowCount} throwaway user(s))`);
