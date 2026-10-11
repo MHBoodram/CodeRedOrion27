@@ -17,7 +17,7 @@
   --radius-md: 16px;
   --radius-sm: 8px;
 
-  font-family: "Segoe UI", "Segoe UI Variable", Tahoma, sans-serif;
+  font-family: "Montserrat", sans-serif;
   color: var(--brand-100);
   background: var(--brand-900);
   font-synthesis: none;
@@ -26,6 +26,13 @@
   -moz-osx-font-smoothing: grayscale;
   font-optical-sizing: auto;
   font-weight: 400;
+}
+
+.montserrat-regular {
+  font-family: "Montserrat", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 400;
+  font-style: normal;
 }
 
 * {
