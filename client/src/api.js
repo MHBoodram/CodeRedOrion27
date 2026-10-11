@@ -99,3 +99,6 @@ api.login = (payload) => request("/api/auth/login", { method: "POST", body: payl
 api.me = (signal) => request("/api/auth/me", { signal });
 api.fits = ({ limit = 20, offset = 0, signal } = {}) => request(`/api/fits?limit=${limit}&offset=${offset}`, { signal });
 api.analyzeFit = (payload) => request("/api/analyze-outfit", { method: "POST", body: payload, timeoutMs: 60000 });
+api.notifications = ({ limit = 20, signal } = {}) => request(`/api/notifications?limit=${limit}`, { signal });
+api.markNotificationRead = (id) => request(`/api/notifications/${id}/read`, { method: "POST" });
+api.markAllNotificationsRead = () => request("/api/notifications/read-all", { method: "POST" });

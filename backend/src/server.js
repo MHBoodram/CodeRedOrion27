@@ -46,6 +46,7 @@ app.get('/', (req, res) => {
       outfits: '/api/outfits',
       analyze: '/api/analyze-outfit',
       fits: '/api/fits',
+      notifications: '/api/notifications',
     },
     example: '/api/outfits?sort=top',
   });
@@ -56,6 +57,7 @@ app.use('/api/users', require('./routes/users'));
 app.use('/api/items', require('./routes/items'));
 app.use('/api/outfits', require('./routes/outfits'));
 app.use('/api/fits', require('./routes/fits'));
+app.use('/api/notifications', require('./routes/notifications'));
  
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));
 app.use(errorHandler);

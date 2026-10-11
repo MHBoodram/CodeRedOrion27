@@ -1,4 +1,4 @@
-// Automated gate checks for the wiring roadmap (Levels 1, 2, 3, 5, 8). Needs the API running.
+// Automated gate checks for the wiring roadmap (Levels 1, 2, 3, 5, 8, 9). Needs the API running.
 // Usage:  npm run verify                       (no Gemini call is made)
 //         npm run verify -- path/to/photo.jpg  (also runs the real Gemini analyze, needs GEMINI_API_KEY on the server)
 // Creates throwaway users named verify_* and deletes them (and their data) at the end.
@@ -132,6 +132,45 @@ const FAKE_IMG = 'A'.repeat(400); // valid base64 shape; Gemini never sees it un
         const h = await call('/api/fits', { token });
         check(h.data?.fits?.length === 2, 'GATE: analyze twice, GET /api/fits lists both', `got ${h.data?.fits?.length}`);
       }
+    }
+  }
+
+  step('Level 9: notifications');
+  const probe = await call('/api/notifications', { token });
+  if (probe.status === 500) {
+    bad('GET /api/notifications failed (500)', 'run the migration: psql "$DATABASE_URL" -f schema-history/003_notifications.sql');
+  } else {
+    check((await call('/api/notifications')).status === 401, 'GET /notifications without a token is 401');
+    check(probe.status === 200 && Array.isArray(probe.data?.notifications) && probe.data.unreadCount === 0, 'new user starts with no notifications');
+    // A second throwaway user: the first one follows them, so they receive a "follow" notification.
+    const uname2 = `verify_b_${stamp}`;
+    const reg2 = await call('/api/auth/register', { method: 'POST', body: { username: uname2, email: `${uname2}@example.com`, password: 'password123' } });
+    const token2 = reg2.data?.token;
+    check((await call(`/api/users/${uname2}/follow`, { method: 'POST', token })).status === 200, 'following a user works');
+    await call(`/api/users/${uname2}/follow`, { method: 'DELETE', token });
+    await call(`/api/users/${uname2}/follow`, { method: 'POST', token }); // follow again: still only one unread notification
+    const n2 = await call('/api/notifications', { token: token2 });
+    const follows = (n2.data?.notifications || []).filter((n) => n.type === 'follow' && n.actor?.username === uname);
+    check(follows.length === 1 && n2.data.unreadCount === 1, 'follow creates one notification (re-follow does not duplicate it)', JSON.stringify(n2.data));
+    const self = await call(`/api/users/${uname}/follow`, { method: 'POST', token });
+    check(self.status === 400 && (await call('/api/notifications', { token })).data?.unreadCount === 0, 'following yourself is rejected and notifies nobody');
+    const nid = follows[0]?.id;
+    check((await call(`/api/notifications/${nid}/read`, { method: 'POST', token })).status === 404, "can't mark someone else's notification read (404)");
+    check((await call(`/api/notifications/${nid}/read`, { method: 'POST', token: token2 })).status === 200, 'marking a notification read works');
+    const n3 = await call('/api/notifications', { token: token2 });
+    check(n3.data?.unreadCount === 0 && n3.data.notifications[0]?.read === true, 'it stays read after a re-fetch ("refresh")');
+    await call(`/api/users/${uname}/follow`, { method: 'POST', token: token2 });
+    const ra = await call('/api/notifications/read-all', { method: 'POST', token });
+    check(ra.status === 200 && ra.data?.updated === 1, 'read-all marks the unread ones read', JSON.stringify(ra.data));
+    // Rating and commenting on alice's outfit notifies alice (we only read; we don't change her read state).
+    if (!own) skip("no alice-owned outfit to rate/comment on for the notification check");
+    else {
+      await call(`/api/outfits/${own.id}/rating`, { method: 'PUT', token, body: { score: 4 } });
+      await call(`/api/outfits/${own.id}/comments`, { method: 'POST', token, body: { body: `verify notify ${stamp}` } });
+      const an = await call('/api/notifications?limit=50', { token: aliceToken });
+      const mine = (an.data?.notifications || []).filter((n) => n.actor?.username === uname);
+      check(mine.some((n) => n.type === 'rating' && n.detail === '4' && n.outfit?.id === own.id), "rating an outfit notifies its owner");
+      check(mine.some((n) => n.type === 'comment' && n.detail === `verify notify ${stamp}`), 'commenting on an outfit notifies its owner');
     }
   }
 

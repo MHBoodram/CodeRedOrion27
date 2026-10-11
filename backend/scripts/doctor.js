@@ -49,9 +49,9 @@ async function checkDb() {
   try {
     const { rows } = await client.query(`SELECT table_name FROM information_schema.tables WHERE table_schema='public'`);
     const have = new Set(rows.map((r) => r.table_name));
-    const need = ['users', 'outfits', 'ratings', 'comments', 'follows', 'fit_analyses'];
+    const need = ['users', 'outfits', 'ratings', 'comments', 'follows', 'fit_analyses', 'notifications'];
     const missing = need.filter((t) => !have.has(t));
-    if (missing.length) bad(`missing tables: ${missing.join(', ')}`, missing.includes('fit_analyses') && missing.length === 1 ? 'psql "$DATABASE_URL" -f schema-history/002_fit_analyses.sql' : 'psql "$DATABASE_URL" -f schema-history/schema.sql (then 002_fit_analyses.sql)');
+    if (missing.length) bad(`missing tables: ${missing.join(', ')}`, missing.every((t) => ['fit_analyses', 'notifications'].includes(t)) ? 'psql "$DATABASE_URL" -f schema-history/002_fit_analyses.sql -f schema-history/003_notifications.sql' : 'psql "$DATABASE_URL" -f schema-history/schema.sql (then 002_fit_analyses.sql)');
     else ok('core tables exist');
     if (!missing.includes('users')) {
       const u = await client.query(`SELECT username FROM users WHERE username = 'alice'`);

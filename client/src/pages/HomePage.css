@@ -2260,3 +2260,13 @@
   }
 
 }
+
+.notification-dropdown-header > button {
+  border: 0;
+  background: none;
+  color: var(--lilac-ash);
+  font: inherit;
+  font-size: 0.78rem;
+  text-decoration: underline;
+  cursor: pointer;
+}

@@ -65,38 +65,3 @@ export const dummyFriends = [
     comments: [{ id: "nina-comment-1", username: "jordan.in.motion", text: "Love this color story." }],
   },
 ];
-
-export const dummyNotifications = [
-  {
-    id: "notification-friend-maya",
-    type: "New friend",
-    actor: "maya.moves",
-    message: "Added you as a friend.",
-    time: "5 min ago",
-    read: false,
-  },
-  {
-    id: "notification-rating-jordan",
-    type: "New rating",
-    actor: "jordan.in.motion",
-    message: "Rated your outfit 5 out of 5 stars.",
-    time: "22 min ago",
-    read: false,
-  },
-  {
-    id: "notification-comment-nina",
-    type: "New comment",
-    actor: "nina.afterhours",
-    message: "Left a comment on your outfit.",
-    time: "1 hour ago",
-    read: false,
-  },
-  {
-    id: "notification-photo-maya",
-    type: "New outfit",
-    actor: "maya.moves",
-    message: "Posted a new outfit photo.",
-    time: "3 hours ago",
-    read: false,
-  },
-];

@@ -5,13 +5,31 @@ import WeatherBadge from "../components/WeatherBadge.jsx";
 import { api, describeError } from "../api.js";
 import { useAuth } from "../auth.jsx";
 import { makeThumbnail } from "../Imageutils.js";
-import { dummyNotifications } from "../data/dummyDatabase.js";
 import { requestStyleMoodboard } from "../styleGuideApi.js";
 import "./HomePage.css";
 import "./Analysis.css";
 
 // Longest edge of any photo we keep or upload. Keeps request bodies small (server limit is 6 MB).
 const MAX_OUTFIT_IMAGE_EDGE = 1024;
+
+// Turns a notification row from the API into the text the dropdown shows.
+function describeNotification(n) {
+  const outfit = n.outfit?.title ? ` "${n.outfit.title}"` : " your outfit";
+  if (n.type === "rating") return { label: "New rating", message: `Rated${outfit} ${n.detail} out of 5 stars.` };
+  if (n.type === "comment") return { label: "New comment", message: n.detail ? `Commented on${outfit}: ${n.detail}` : `Commented on${outfit}.` };
+  if (n.type === "follow") return { label: "New follower", message: "Started following you." };
+  return { label: "Update", message: "" };
+}
+
+function timeAgo(iso) {
+  const seconds = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
+  if (seconds < 60) return "just now";
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} hr ago`;
+  return `${Math.round(hours / 24)} d ago`;
+}
 
 const navItems = ["Today's Fit", "Past Fits", "Friends", "Style Guide"];
 
@@ -118,7 +136,8 @@ export default function HomePage() {
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isNotificationMenuOpen, setIsNotificationMenuOpen] = useState(false);
-  const [notifications, setNotifications] = useState(dummyNotifications);
+  const [notifications, setNotifications] = useState([]);
+  const [notificationsError, setNotificationsError] = useState("");
   const [cameraStarted, setCameraStarted] = useState(false);
   const [cameraStatus, setCameraStatus] = useState("idle");
   const [cameraError, setCameraError] = useState("");
@@ -150,6 +169,23 @@ export default function HomePage() {
   const isFriendsView = activeTab === "Friends";
   const isPhotoCountdownActive = countdownRemaining !== null && photoCountdownTimerRef.current !== null;
   const unreadNotificationCount = notifications.filter((notification) => !notification.read).length;
+
+  // Load notifications on mount, every 30 seconds, and whenever the bell is opened.
+  useEffect(() => {
+    const controller = new AbortController();
+    let cancelled = false;
+    async function load() {
+      try {
+        const data = await api.notifications({ signal: controller.signal });
+        if (!cancelled) { setNotifications(data.notifications || []); setNotificationsError(""); }
+      } catch (error) {
+        if (!cancelled && !controller.signal.aborted) setNotificationsError(describeError(error));
+      }
+    }
+    load();
+    const timer = window.setInterval(load, 30000);
+    return () => { cancelled = true; controller.abort(); window.clearInterval(timer); };
+  }, [isNotificationMenuOpen]);
   const fitScore = typeof analysisResult?.score === "number" ? analysisResult.score : null;
   const noOutfitDetected = analysisResult !== null && analysisResult.score === null;
 
@@ -285,10 +321,24 @@ export default function HomePage() {
     };
   }, [isAccountMenuOpen, isSettingsOpen, isNotificationMenuOpen]);
 
-  function markNotificationRead(notificationId) {
+  async function markNotificationRead(notificationId) {
     setNotifications((current) => current.map((notification) => (
       notification.id === notificationId ? { ...notification, read: true } : notification
     )));
+    try {
+      await api.markNotificationRead(notificationId);
+    } catch (error) {
+      setNotificationsError(describeError(error));
+    }
+  }
+
+  async function markAllNotificationsRead() {
+    setNotifications((current) => current.map((notification) => ({ ...notification, read: true })));
+    try {
+      await api.markAllNotificationsRead();
+    } catch (error) {
+      setNotificationsError(describeError(error));
+    }
   }
 
   useEffect(() => {
@@ -652,10 +702,16 @@ export default function HomePage() {
                 <header className="notification-dropdown-header">
                   <h2>Notifications</h2>
                   <span>{unreadNotificationCount} new</span>
+                  {unreadNotificationCount > 0 && (
+                    <button type="button" onClick={markAllNotificationsRead}>Mark all read</button>
+                  )}
                 </header>
+                {notificationsError && <p className="notification-empty" role="alert">{notificationsError}</p>}
                 {notifications.length ? (
                   <ul>
-                    {notifications.map((notification) => (
+                    {notifications.map((notification) => {
+                      const { label, message } = describeNotification(notification);
+                      return (
                       <li key={notification.id}>
                         <button
                           className={`notification-item${notification.read ? "" : " unread"}`}
@@ -663,16 +719,17 @@ export default function HomePage() {
                           role="menuitem"
                           onClick={() => markNotificationRead(notification.id)}
                         >
-                          <span className="notification-type">{notification.type}</span>
+                          <span className="notification-type">{label}</span>
                           <span className="notification-copy">
-                            <strong>{notification.actor}</strong>
-                            <span>{notification.message}</span>
-                            <time>{notification.time}</time>
+                            <strong>{notification.actor.displayName || notification.actor.username}</strong>
+                            <span>{message}</span>
+                            <time>{timeAgo(notification.createdAt)}</time>
                           </span>
                           {!notification.read && <span className="notification-unread-dot" aria-label="Unread" />}
                         </button>
                       </li>
-                    ))}
+                      );
+                    })}
                   </ul>
                 ) : (
                   <p className="notification-empty">You’re all caught up.</p>

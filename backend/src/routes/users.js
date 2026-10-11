@@ -4,6 +4,7 @@ const db = require('../db');
 const { HttpError, validate } = require('../errors');
 const { requireAuth, optionalAuth } = require('../middleware/auth');
 const { VISIBLE, OUTFIT_SELECT } = require('../lib/outfitQueries');
+const { notify } = require('../lib/notify');
 
 const patchSchema = z
   .object({
@@ -64,10 +65,11 @@ router.post('/:username/follow', requireAuth, async (req, res) => {
   const { rows } = await db.query('SELECT id FROM users WHERE username = $1', [req.params.username]);
   if (!rows[0]) throw new HttpError(404, 'User not found');
   if (rows[0].id === req.user.id) throw new HttpError(400, "You can't follow yourself");
-  await db.query(
+  const inserted = await db.query(
     'INSERT INTO follows (follower_id, following_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
     [req.user.id, rows[0].id]
   );
+  if (inserted.rowCount) await notify({ userId: rows[0].id, actorId: req.user.id, type: 'follow' });
   res.json({ following: true });
 });
 
