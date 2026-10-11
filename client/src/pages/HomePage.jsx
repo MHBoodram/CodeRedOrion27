@@ -1091,11 +1091,7 @@ export default function HomePage() {
                     <strong>{analysisResult?.score ?? "—"}</strong>
                     <span>/ 10</span>
                   </div>
-                  {analysisResult?.verdict ? (
-                    <p>{analysisResult.verdict}</p>
-                  ) : capturedFit ? (
-                    <p>Enter a target style to get outfit feedback.</p>
-                  ) : null}
+                  <p>{analysisResult?.verdict || (capturedFit ? "Enter a target style to get outfit feedback." : "Take a photo of your fit to reveal your style score.")}</p>
                   {analysisResult?.whatsWorking?.length > 0 && (
                     <div className="score-notes">
                       <h3>What’s working</h3>
