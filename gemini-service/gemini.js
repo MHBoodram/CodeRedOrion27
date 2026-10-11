@@ -12,7 +12,7 @@ function getGeminiClient() {
 // Step 2: the instructions. Asking for strict JSON means React can use the answer directly.
 function buildPrompt({ targetStyle, weather }) {
   return `You are a friendly, honest fashion stylist. Look at the outfit in the photo.
-If there is no outfit or person visible, set "score" to null and explain in "verdict".
+If there is no outfit or person visible, set "score" to null and explain in "verdict". Also extract the 3-4 main colors of the outfit ONLY and return in hex code format.
 ${targetStyle ? `The person is aiming for this style: ${targetStyle}.` : ""}
 ${weather ? `Current weather: ${weather.tempF}F, ${weather.description}.` : ""}
 
