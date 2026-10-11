@@ -1,0 +1,65 @@
+/* Styles for the Gemini analysis UI and the Friends feed toggle. */
+.friends-scope {
+  display: flex;
+  gap: 10px;
+  margin: 0 0 18px;
+}
+
+.analysis-form {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 16px;
+}
+
+.analysis-form label {
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.analysis-form-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.analysis-form-row input {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.analysis-verdict {
+  margin: 4px 0 12px;
+  font-size: 17px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.analysis-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.analysis-chips span {
+  padding: 5px 11px;
+  border: 1px solid var(--line, rgba(176, 145, 159, 0.3));
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 12px;
+}
+
+.fit-feedback h3 {
+  margin: 16px 0 6px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted, rgba(249, 241, 240, 0.7));
+}
+
+.analysis-weather {
+  margin-top: 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted, rgba(249, 241, 240, 0.7));
+}
