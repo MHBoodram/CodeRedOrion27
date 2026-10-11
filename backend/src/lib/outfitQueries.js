@@ -25,7 +25,8 @@ const OUTFIT_SELECT = `
                    FROM outfit_tags ot JOIN tags t ON t.id = ot.tag_id
                    WHERE ot.outfit_id = o.id), '[]'::json) AS tags,
          (SELECT r.score FROM ratings r WHERE r.outfit_id = o.id AND r.user_id = $1::uuid) AS my_rating,
-         EXISTS (SELECT 1 FROM saved_outfits s WHERE s.outfit_id = o.id AND s.user_id = $1::uuid) AS saved
+         EXISTS (SELECT 1 FROM saved_outfits s WHERE s.outfit_id = o.id AND s.user_id = $1::uuid) AS saved,
+         EXISTS (SELECT 1 FROM follows fw WHERE fw.follower_id = $1::uuid AND fw.following_id = o.user_id) AS author_followed
   FROM outfits o
   JOIN users u ON u.id = o.user_id`;
 

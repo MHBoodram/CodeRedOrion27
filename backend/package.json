@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
-    "seed": "node scripts/seed.js"
+    "seed": "node scripts/seed.js",
+    "doctor": "node scripts/doctor.js",
+    "verify": "node scripts/verify.js"
   },
   "dependencies": {
     "@google/genai": "^2.28.0",

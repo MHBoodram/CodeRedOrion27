@@ -2,67 +2,47 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import girlLogo from "../assets/Girl(6).svg";
 import WeatherBadge from "../components/WeatherBadge.jsx";
-import { api, clearAuth } from "../api.js";
-import { dummyNotifications, dummyPastFits } from "../data/dummyDatabase.js";
+import { api, describeError } from "../api.js";
+import { useAuth } from "../auth.jsx";
+import { makeThumbnail } from "../Imageutils.js";
 import { requestStyleMoodboard } from "../styleGuideApi.js";
 import "./HomePage.css";
 import "./Analysis.css";
 
-const MAX_OUTFIT_IMAGE_EDGE = 1600;
+// Longest edge of any photo we keep or upload. Keeps request bodies small (server limit is 6 MB).
+const MAX_OUTFIT_IMAGE_EDGE = 1024;
 
-const navItems = ["Today's Fit", "Past Fits", "Friends", "Style Guide"];
-
-const recommendations = [
-  {
-    name: "Soft Tailored Coat",
-    brand: "Maison de Lune",
-    price: "$238",
-    style: "Warm neutrals",
-    image:
-      "https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=900&q=80",
-  },
-  {
-    name: "Leather Mini",
-    brand: "Vanta Atelier",
-    price: "$189",
-    style: "Night out",
-    image:
-      "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=900&q=80",
-  },
-  {
-    name: "Silk Statement Set",
-    brand: "Veloura",
-    price: "$210",
-    style: "Fluid layers",
-    image:
-      "https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=900&q=80",
-  },
-];
-
-const savedLooks = [
-  { name: "Cinnamon layers", time: "2h ago" },
-  { name: "Weekend ease", time: "1d ago" },
-  { name: "City minimal", time: "3d ago" },
-];
-
-function getCurrentUsername() {
-  try {
-    const savedUser = JSON.parse(window.localStorage.getItem("fitcheck-user") || "null");
-    const session = JSON.parse(window.localStorage.getItem("fitcheck-session") || "null");
-    return savedUser?.username || session?.username || savedUser?.name || session?.name || "Guest";
-  } catch {
-    return "Guest";
-  }
+// Turns a notification row from the API into the text the dropdown shows.
+function describeNotification(n) {
+  const outfit = n.outfit?.title ? ` "${n.outfit.title}"` : " your outfit";
+  if (n.type === "rating") return { label: "New rating", message: `Rated${outfit} ${n.detail} out of 5 stars.` };
+  if (n.type === "comment") return { label: "New comment", message: n.detail ? `Commented on${outfit}: ${n.detail}` : `Commented on${outfit}.` };
+  if (n.type === "follow") return { label: "New follower", message: "Started following you." };
+  return { label: "Update", message: "" };
 }
 
-function getCurrentEmail() {
-  try {
-    const savedUser = JSON.parse(window.localStorage.getItem("fitcheck-user") || "null");
-    const session = JSON.parse(window.localStorage.getItem("fitcheck-session") || "null");
-    return savedUser?.email || session?.email || "No email saved";
-  } catch {
-    return "No email saved";
-  }
+function timeAgo(iso) {
+  const seconds = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
+  if (seconds < 60) return "just now";
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} hr ago`;
+  return `${Math.round(hours / 24)} d ago`;
+}
+
+const navItems = ["Today's Fit", "Past Fits", "Friends", "Saved", "Style Guide"];
+
+function getWeatherDescription(code) {
+  if (code === 0) return "Clear skies";
+  if ([1, 2].includes(code)) return "Partly cloudy";
+  if (code === 3) return "Cloudy";
+  if ([45, 48].includes(code)) return "Foggy";
+  if ([51, 53, 55, 56, 57].includes(code)) return "Light drizzle";
+  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return "Rain expected";
+  if ([71, 73, 75, 77, 85, 86].includes(code)) return "Snow expected";
+  if ([95, 96, 99].includes(code)) return "Thunderstorms";
+  return "Check local conditions";
 }
 
 function resizeImageFile(file) {
@@ -98,8 +78,9 @@ function resizeImageFile(file) {
 }
 
 export default function HomePage() {
-  const username = getCurrentUsername();
-  const email = getCurrentEmail();
+  const { user, logout, updateUser } = useAuth();
+  const username = user?.username || "Guest";
+  const email = user?.email || "";
   const usernameInitials = username.slice(0, 2).toUpperCase();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("Camera");
@@ -108,30 +89,47 @@ export default function HomePage() {
   const [styleGuideStatus, setStyleGuideStatus] = useState("idle");
   const [styleGuideError, setStyleGuideError] = useState("");
   const [friends, setFriends] = useState([]);
-  const [friendsScope, setFriendsScope] = useState("following");
+  const [friendsScope, setFriendsScope] = useState("all");
   const [friendsStatus, setFriendsStatus] = useState("idle");
   const [friendsError, setFriendsError] = useState("");
   const [friendComments, setFriendComments] = useState({});
   const [friendCommentDrafts, setFriendCommentDrafts] = useState({});
+  const [friendHoverRatings, setFriendHoverRatings] = useState({});
+  const [pendingActions, setPendingActions] = useState({});
+  const [savedOutfits, setSavedOutfits] = useState([]);
+  const [savedStatus, setSavedStatus] = useState("loading");
+  const [savedError, setSavedError] = useState("");
+  const [recommended, setRecommended] = useState([]);
+  const [recommendedStatus, setRecommendedStatus] = useState("loading");
+  const [settingsDraft, setSettingsDraft] = useState(null);
+  const [settingsStatus, setSettingsStatus] = useState("idle");
+  const [settingsError, setSettingsError] = useState("");
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isNotificationMenuOpen, setIsNotificationMenuOpen] = useState(false);
-  const [notifications, setNotifications] = useState(dummyNotifications);
+  const [notifications, setNotifications] = useState([]);
+  const [notificationsError, setNotificationsError] = useState("");
   const [cameraStarted, setCameraStarted] = useState(false);
   const [cameraStatus, setCameraStatus] = useState("idle");
   const [cameraError, setCameraError] = useState("");
   const [cameraSwitchMessage, setCameraSwitchMessage] = useState("");
+  const [photoCountdown, setPhotoCountdown] = useState(3);
+  const [countdownRemaining, setCountdownRemaining] = useState(null);
   const [currentWeather, setCurrentWeather] = useState(null);
   const [capturedFit, setCapturedFit] = useState("");
   const [targetStyle, setTargetStyle] = useState("");
   const [analysisResult, setAnalysisResult] = useState(null);
   const [analysisStatus, setAnalysisStatus] = useState("idle");
   const [analysisError, setAnalysisError] = useState("");
+  const [pastFits, setPastFits] = useState([]);
+  const [pastFitsStatus, setPastFitsStatus] = useState("idle");
+  const [pastFitsError, setPastFitsError] = useState("");
   const videoRef = useRef(null);
   const photoInputRef = useRef(null);
   const cameraStreamRef = useRef(null);
   const cameraDevicesRef = useRef([]);
   const cameraSessionRef = useRef(0);
+  const photoCountdownTimerRef = useRef(null);
   const accountMenuRef = useRef(null);
   const notificationMenuRef = useRef(null);
   const accountMenuCloseTimerRef = useRef(null);
@@ -140,13 +138,59 @@ export default function HomePage() {
   const isStyleGuideView = activeTab === "Style Guide";
   const isCameraView = activeTab === "Camera";
   const isFriendsView = activeTab === "Friends";
+  const isSavedView = activeTab === "Saved";
+  // The hero/recommendations page. No nav item opens it right now; it shows when no other tab is active.
+  const isHomeView = !isStyleGuideView && !isFriendsView && !isSavedView && !isHistoryView && !isCameraView;
+  const isPhotoCountdownActive = countdownRemaining !== null && photoCountdownTimerRef.current !== null;
   const unreadNotificationCount = notifications.filter((notification) => !notification.read).length;
+
+  // Load notifications on mount, every 30 seconds, and whenever the bell is opened.
+  useEffect(() => {
+    const controller = new AbortController();
+    let cancelled = false;
+    async function load() {
+      try {
+        const data = await api.notifications({ signal: controller.signal });
+        if (!cancelled) { setNotifications(data.notifications || []); setNotificationsError(""); }
+      } catch (error) {
+        if (!cancelled && !controller.signal.aborted) setNotificationsError(describeError(error));
+      }
+    }
+    load();
+    const timer = window.setInterval(load, 30000);
+    return () => { cancelled = true; controller.abort(); window.clearInterval(timer); };
+  }, [isNotificationMenuOpen]);
+  const fitScore = typeof analysisResult?.score === "number" ? analysisResult.score : null;
+  const noOutfitDetected = analysisResult !== null && analysisResult.score === null;
+
+  // Reload history every time the Past Fits tab opens, so a fit analyzed a moment ago is always there.
+  useEffect(() => {
+    if (!isHistoryView) return undefined;
+
+    const controller = new AbortController();
+    setPastFitsStatus("loading");
+    setPastFitsError("");
+    api
+      .fits({ limit: 50, signal: controller.signal })
+      .then(({ fits = [] }) => {
+        setPastFits(fits);
+        setPastFitsStatus("success");
+      })
+      .catch((error) => {
+        if (error?.name === "AbortError") return;
+        setPastFitsError(describeError(error));
+        setPastFitsStatus("error");
+      });
+    return () => controller.abort();
+  }, [isHistoryView]);
 
   useEffect(() => {
     if (!isFriendsView) return undefined;
 
     const controller = new AbortController();
     const query = new URLSearchParams({ sort: "recent", scope: friendsScope, limit: "20" });
+    setFriendsStatus("loading");
+    setFriendsError("");
 
     api(`/outfits?${query}`, { signal: controller.signal })
       .then(async ({ outfits = [] }) => {
@@ -172,6 +216,144 @@ export default function HomePage() {
 
     return () => controller.abort();
   }, [friendsScope, isFriendsView]);
+
+  // Saved outfits: refetch each time the Saved tab opens. (Status starts at "loading", so no synchronous setState here.)
+  useEffect(() => {
+    if (!isSavedView && !isHomeView) return undefined;
+
+    const controller = new AbortController();
+    api("/users/me/saved?limit=50", { signal: controller.signal })
+      .then(({ outfits = [] }) => {
+        setSavedOutfits(outfits);
+        setSavedError("");
+        setSavedStatus("success");
+      })
+      .catch((error) => {
+        if (controller.signal.aborted) return;
+        setSavedError(describeError(error));
+        setSavedStatus("error");
+      });
+
+    return () => controller.abort();
+  }, [isSavedView, isHomeView]);
+
+  // Home recommendations: top-rated outfits, or the newest ones if nothing has been rated yet.
+  useEffect(() => {
+    if (!isHomeView) return undefined;
+
+    const controller = new AbortController();
+    api("/outfits?sort=top&limit=3", { signal: controller.signal })
+      .then(async ({ outfits = [] }) => {
+        if (outfits.length) return outfits;
+        return (await api("/outfits?sort=recent&limit=3", { signal: controller.signal })).outfits || [];
+      })
+      .then((outfits) => {
+        setRecommended(outfits);
+        setRecommendedStatus("success");
+      })
+      .catch((error) => {
+        if (controller.signal.aborted) return;
+        setRecommendedStatus("error");
+        console.error("Could not load recommendations:", describeError(error));
+      });
+
+    return () => controller.abort();
+  }, [isHomeView]);
+
+  function openSettings() {
+    setSettingsDraft({ display_name: user?.display_name || "", bio: user?.bio || "", avatar_url: user?.avatar_url || "" });
+    setSettingsStatus("idle");
+    setSettingsError("");
+    setIsSettingsOpen(true);
+  }
+
+  async function saveSettings(event) {
+    event.preventDefault();
+    const displayName = settingsDraft.display_name.trim();
+    if (!displayName) {
+      setSettingsError("Display name can't be empty.");
+      setSettingsStatus("error");
+      return;
+    }
+    setSettingsStatus("saving");
+    setSettingsError("");
+    try {
+      const { user: updated } = await api("/users/me", {
+        method: "PATCH",
+        body: { display_name: displayName, bio: settingsDraft.bio.trim(), avatar_url: settingsDraft.avatar_url.trim() },
+      });
+      updateUser(updated);
+      setSettingsDraft({ display_name: updated.display_name || "", bio: updated.bio || "", avatar_url: updated.avatar_url || "" });
+      setSettingsStatus("saved");
+    } catch (error) {
+      setSettingsError(describeError(error));
+      setSettingsStatus("error");
+    }
+  }
+
+  // Runs `action` once per key at a time, so a double click can't fire two requests.
+  async function runOnce(key, action) {
+    if (pendingActions[key]) return;
+    setPendingActions((current) => ({ ...current, [key]: true }));
+    try {
+      await action();
+    } finally {
+      setPendingActions((current) => ({ ...current, [key]: false }));
+    }
+  }
+
+  // Follow / unfollow an outfit's author. Updates every card by that author right away, and rolls back if the server refuses.
+  function toggleFollowAuthor(outfit) {
+    const author = outfit.author;
+    if (!author?.username || author.username === username) return;
+    const next = !outfit.author_followed;
+    const setFollowed = (value) => setFriends((current) => current.map((o) => (
+      o.author?.id === author.id ? { ...o, author_followed: value } : o
+    )));
+    return runOnce(`follow-${author.id}`, async () => {
+      setFollowed(next);
+      try {
+        await api(`/users/${encodeURIComponent(author.username)}/follow`, { method: next ? "POST" : "DELETE" });
+        setFriendsError("");
+      } catch (error) {
+        setFollowed(!next);
+        setFriendsError(describeError(error));
+      }
+    });
+  }
+
+  // Save / unsave an outfit from the Friends feed.
+  function toggleSaveOutfit(outfit) {
+    const next = !outfit.saved;
+    const setSaved = (value) => setFriends((current) => current.map((o) => (
+      o.id === outfit.id ? { ...o, saved: value } : o
+    )));
+    return runOnce(`save-${outfit.id}`, async () => {
+      setSaved(next);
+      try {
+        await api(`/outfits/${outfit.id}/save`, { method: next ? "POST" : "DELETE" });
+        setFriendsError("");
+      } catch (error) {
+        setSaved(!next);
+        setFriendsError(describeError(error));
+      }
+    });
+  }
+
+  // Remove an outfit from the Saved tab.
+  function removeSavedOutfit(outfit) {
+    return runOnce(`save-${outfit.id}`, async () => {
+      const before = savedOutfits;
+      setSavedOutfits((current) => current.filter((o) => o.id !== outfit.id));
+      try {
+        await api(`/outfits/${outfit.id}/save`, { method: "DELETE" });
+        setSavedError("");
+      } catch (error) {
+        setSavedOutfits(before);
+        setSavedError(describeError(error));
+      }
+    });
+  }
 
   async function rateFriendFit(friendId, rating) {
     try {
@@ -251,10 +433,24 @@ export default function HomePage() {
     };
   }, [isAccountMenuOpen, isSettingsOpen, isNotificationMenuOpen]);
 
-  function markNotificationRead(notificationId) {
+  async function markNotificationRead(notificationId) {
     setNotifications((current) => current.map((notification) => (
       notification.id === notificationId ? { ...notification, read: true } : notification
     )));
+    try {
+      await api.markNotificationRead(notificationId);
+    } catch (error) {
+      setNotificationsError(describeError(error));
+    }
+  }
+
+  async function markAllNotificationsRead() {
+    setNotifications((current) => current.map((notification) => ({ ...notification, read: true })));
+    try {
+      await api.markAllNotificationsRead();
+    } catch (error) {
+      setNotificationsError(describeError(error));
+    }
   }
 
   useEffect(() => {
@@ -272,6 +468,26 @@ export default function HomePage() {
     };
   }, [isCameraView, cameraStarted]);
 
+  useEffect(() => {
+    if (isCameraView && cameraStarted) return;
+
+    window.clearTimeout(photoCountdownTimerRef.current);
+    photoCountdownTimerRef.current = null;
+  }, [isCameraView, cameraStarted]);
+
+  useEffect(() => () => window.clearTimeout(photoCountdownTimerRef.current), []);
+
+  function openFriendsView() {
+    setActiveTab("Friends");
+  }
+
+  function changeFriendsScope(scope) {
+    if (scope === friendsScope) return;
+    setFriends([]);
+    setFriendComments({});
+    setFriendsScope(scope);
+  }
+
   function openCameraPage() {
     setCameraError("");
     setCameraSwitchMessage("");
@@ -282,21 +498,6 @@ export default function HomePage() {
     setActiveTab("Camera");
   }
 
-  function openFriendsView() {
-    if (!isFriendsView) {
-      setFriendsStatus("loading");
-      setFriendsError("");
-    }
-    setActiveTab("Friends");
-  }
-
-  function changeFriendsScope(scope) {
-    if (scope === friendsScope) return;
-    setFriendsStatus("loading");
-    setFriendsError("");
-    setFriendsScope(scope);
-  }
-
   function resetStyleAnalysis() {
     setTargetStyle("");
     setAnalysisResult(null);
@@ -305,11 +506,40 @@ export default function HomePage() {
   }
 
   function setOutfitPhoto(photoData) {
+    cancelPhotoCountdown();
     setCapturedFit(photoData);
     resetStyleAnalysis();
   }
 
+  function cancelPhotoCountdown() {
+    window.clearTimeout(photoCountdownTimerRef.current);
+    photoCountdownTimerRef.current = null;
+    setCountdownRemaining(null);
+  }
+
+  function startPhotoCountdown() {
+    const deadline = Date.now() + photoCountdown * 1000;
+    setCountdownRemaining(photoCountdown);
+
+    function updateCountdown() {
+      const remaining = Math.ceil((deadline - Date.now()) / 1000);
+      if (remaining <= 0) {
+        photoCountdownTimerRef.current = null;
+        setCountdownRemaining(null);
+        captureFit();
+        return;
+      }
+
+      setCountdownRemaining(remaining);
+      const nextTick = deadline - (remaining - 1) * 1000 - Date.now();
+      photoCountdownTimerRef.current = window.setTimeout(updateCountdown, Math.max(1, nextTick));
+    }
+
+    photoCountdownTimerRef.current = window.setTimeout(updateCountdown, 1000);
+  }
+
   async function startCamera() {
+    setCountdownRemaining(null);
     setCameraError("");
     setCameraStatus("loading");
     setCameraStarted(true);
@@ -356,13 +586,16 @@ export default function HomePage() {
   }
 
   function retakePhoto() {
+    cancelPhotoCountdown();
     setCapturedFit("");
     setCameraError("");
     setCameraStarted(false);
     setCameraStatus("idle");
+    resetStyleAnalysis();
   }
 
   function backToPhotoChoices() {
+    cancelPhotoCountdown();
     setCameraError("");
     setCameraSwitchMessage("");
     setCameraStarted(false);
@@ -370,11 +603,8 @@ export default function HomePage() {
   }
 
   function handleLogout() {
-    try {
-      clearAuth();
-    } finally {
-      navigate("/login");
-    }
+    logout();
+    navigate("/login");
   }
 
   async function handleStyleGuideSubmit(event) {
@@ -519,23 +749,20 @@ export default function HomePage() {
     setAnalysisError("");
     setAnalysisResult(null);
     try {
-      const result = await api("/analyze-outfit", {
-        method: "POST",
-        body: {
-          image: dataUrlMatch[2],
-          mimeType: dataUrlMatch[1],
-          targetStyle: normalizedTargetStyle,
-          weather: currentWeather
-            ? { tempF: currentWeather.tempF, description: currentWeather.description }
-            : undefined,
-        },
+      const thumbnail = await makeThumbnail(capturedFit);
+      const result = await api.analyzeFit({
+        image: dataUrlMatch[2],
+        mimeType: dataUrlMatch[1],
+        targetStyle: normalizedTargetStyle,
+        thumbnail: thumbnail || undefined,
+        weather: currentWeather
+          ? { tempF: currentWeather.tempF, description: currentWeather.description }
+          : undefined,
       });
       setAnalysisResult(result);
       setAnalysisStatus("success");
     } catch (error) {
-      setAnalysisError(error instanceof Error
-        ? error.message
-        : "Could not reach Gemini. Check that the Gemini service is running.");
+      setAnalysisError(describeError(error) || "Could not analyze this photo. Please try again.");
       setAnalysisStatus("error");
     }
   }
@@ -587,10 +814,16 @@ export default function HomePage() {
                 <header className="notification-dropdown-header">
                   <h2>Notifications</h2>
                   <span>{unreadNotificationCount} new</span>
+                  {unreadNotificationCount > 0 && (
+                    <button type="button" onClick={markAllNotificationsRead}>Mark all read</button>
+                  )}
                 </header>
+                {notificationsError && <p className="notification-empty" role="alert">{notificationsError}</p>}
                 {notifications.length ? (
                   <ul>
-                    {notifications.map((notification) => (
+                    {notifications.map((notification) => {
+                      const { label, message } = describeNotification(notification);
+                      return (
                       <li key={notification.id}>
                         <button
                           className={`notification-item${notification.read ? "" : " unread"}`}
@@ -598,16 +831,17 @@ export default function HomePage() {
                           role="menuitem"
                           onClick={() => markNotificationRead(notification.id)}
                         >
-                          <span className="notification-type">{notification.type}</span>
+                          <span className="notification-type">{label}</span>
                           <span className="notification-copy">
-                            <strong>{notification.actor}</strong>
-                            <span>{notification.message}</span>
-                            <time>{notification.time}</time>
+                            <strong>{notification.actor.displayName || notification.actor.username}</strong>
+                            <span>{message}</span>
+                            <time>{timeAgo(notification.createdAt)}</time>
                           </span>
                           {!notification.read && <span className="notification-unread-dot" aria-label="Unread" />}
                         </button>
                       </li>
-                    ))}
+                      );
+                    })}
                   </ul>
                 ) : (
                   <p className="notification-empty">You’re all caught up.</p>
@@ -633,8 +867,10 @@ export default function HomePage() {
                 setIsAccountMenuOpen((open) => !open);
               }}
             >
-              <span className="avatar" aria-hidden="true">{usernameInitials}</span>
-              <strong>{username}</strong>
+              <span className="avatar" aria-hidden="true">
+                {user?.avatar_url ? <img src={user.avatar_url} alt="" /> : usernameInitials}
+              </span>
+              <strong>{user?.display_name || username}</strong>
               <span className="account-chevron" aria-hidden="true">⌄</span>
             </button>
             {isAccountMenuOpen && (
@@ -645,7 +881,7 @@ export default function HomePage() {
                   onClick={() => {
                     window.clearTimeout(accountMenuCloseTimerRef.current);
                     setIsAccountMenuOpen(false);
-                    setIsSettingsOpen(true);
+                    openSettings();
                   }}
                 >
                   Settings
@@ -733,12 +969,63 @@ export default function HomePage() {
               </section>
             )}
           </section>
+        ) : isSavedView ? (
+          <section className="friends-page" aria-labelledby="saved-heading">
+            <header className="friends-page-header">
+              <p className="mini-label">Your collection</p>
+              <h1 id="saved-heading">Saved</h1>
+              <p>Outfits you bookmarked from the Friends feed.</p>
+            </header>
+            {savedStatus === "loading" && <p className="style-guide-status" role="status">Loading saved outfits…</p>}
+            {savedError && <p className="style-guide-error" role="alert">{savedError}</p>}
+            {savedStatus === "success" && savedOutfits.length === 0 && (
+              <p className="style-guide-status">Nothing saved yet. Tap Save on an outfit in Friends.</p>
+            )}
+            <div className="friends-grid">
+              {savedOutfits.map((outfit) => (
+                <article className="friend-card" key={outfit.id}>
+                  <header className="friend-card-header">
+                    <div className="friend-avatar" aria-hidden="true">{(outfit.author?.username || "??").slice(0, 2).toUpperCase()}</div>
+                    <div>
+                      <h2>{outfit.author?.username || "unknown"}</h2>
+                      <time dateTime={outfit.created_at}>
+                        {new Date(outfit.created_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}
+                      </time>
+                    </div>
+                    <div className="friend-card-actions">
+                      <button
+                        type="button"
+                        className="secondary-btn friend-action"
+                        disabled={Boolean(pendingActions[`save-${outfit.id}`])}
+                        onClick={() => removeSavedOutfit(outfit)}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </header>
+                  {outfit.cover_image_url && (
+                    <img className="friend-photo" src={outfit.cover_image_url} alt={`${outfit.author?.username || "Someone"} wearing ${outfit.title}`} />
+                  )}
+                  <div className="friend-card-details">
+                    <h3>{outfit.title}</h3>
+                    <p className="friend-fit-score">
+                      <span>Community rating (1–5)</span>
+                      <strong>
+                        {outfit.rating_count ? `${Number(outfit.rating_avg).toFixed(1)} / 5 (${outfit.rating_count})` : "No ratings yet"}
+                      </strong>
+                    </p>
+                    {outfit.description && <p className="friend-style-worn">{outfit.description}</p>}
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
         ) : isFriendsView ? (
           <section className="friends-page" aria-labelledby="friends-heading">
             <header className="friends-page-header">
               <p className="mini-label">Community</p>
               <h1 id="friends-heading">Friends</h1>
-              <p>See what your friends are wearing and share your take.</p>
+              <p>See what your friends are wearing today and share your take.</p>
             </header>
             <div className="friends-scope" role="group" aria-label="Choose a feed">
               <button type="button" className={friendsScope === "following" ? "primary-btn" : "secondary-btn"} onClick={() => changeFriendsScope("following")}>
@@ -759,9 +1046,10 @@ export default function HomePage() {
             )}
             <div className="friends-grid">
               {friends.map((outfit) => {
-                const author = outfit.author;
-                const comments = friendComments[outfit.id] || [];
+                const author = outfit.author || { username: "unknown" };
                 const isOwnOutfit = author.username === username;
+                const comments = friendComments[outfit.id] || [];
+                const displayedRating = friendHoverRatings[outfit.id] ?? outfit.my_rating ?? 0;
                 return (
                   <article className="friend-card" key={outfit.id}>
                     <header className="friend-card-header">
@@ -772,6 +1060,28 @@ export default function HomePage() {
                           {new Date(outfit.created_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}
                         </time>
                       </div>
+                      <div className="friend-card-actions">
+                        {!isOwnOutfit && (
+                          <button
+                            type="button"
+                            className={outfit.author_followed ? "secondary-btn friend-action active" : "secondary-btn friend-action"}
+                            aria-pressed={Boolean(outfit.author_followed)}
+                            disabled={Boolean(pendingActions[`follow-${author.id}`])}
+                            onClick={() => toggleFollowAuthor(outfit)}
+                          >
+                            {outfit.author_followed ? "Following" : "Follow"}
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className={outfit.saved ? "secondary-btn friend-action active" : "secondary-btn friend-action"}
+                          aria-pressed={Boolean(outfit.saved)}
+                          disabled={Boolean(pendingActions[`save-${outfit.id}`])}
+                          onClick={() => toggleSaveOutfit(outfit)}
+                        >
+                          {outfit.saved ? "Saved" : "Save"}
+                        </button>
+                      </div>
                     </header>
                     {outfit.cover_image_url && (
                       <img className="friend-photo" src={outfit.cover_image_url} alt={`${author.username} wearing ${outfit.title}`} />
@@ -779,9 +1089,9 @@ export default function HomePage() {
                     <div className="friend-card-details">
                       <h3>{outfit.title}</h3>
                       <p className="friend-fit-score">
-                        <span>Community rating</span>
+                        <span>Rated:</span>
                         <strong>
-                          {outfit.rating_count ? `${outfit.rating_avg.toFixed(1)} / 5 (${outfit.rating_count})` : "No ratings yet"}
+                          {outfit.rating_count ? `${Number(outfit.rating_avg).toFixed(1)} / 5` : "No ratings yet"}
                         </strong>
                       </p>
                       {outfit.description && <p className="friend-style-worn">{outfit.description}</p>}
@@ -791,15 +1101,35 @@ export default function HomePage() {
                           <span>Your rating</span>
                           <span>{outfit.my_rating ? `${outfit.my_rating} / 5` : isOwnOutfit ? "Your outfit" : "Not rated"}</span>
                         </div>
-                        <div className="friend-stars" role="group" aria-label={`Rate ${author.username} out of five stars`}>
+                        <div
+                          className="friend-stars"
+                          role="group"
+                          aria-label={`Rate ${author.username} out of five stars`}
+                          onMouseLeave={() => setFriendHoverRatings((current) => {
+                            const next = { ...current };
+                            delete next[outfit.id];
+                            return next;
+                          })}
+                          onBlur={(event) => {
+                            if (!event.currentTarget.contains(event.relatedTarget)) {
+                              setFriendHoverRatings((current) => {
+                                const next = { ...current };
+                                delete next[outfit.id];
+                                return next;
+                              });
+                            }
+                          }}
+                        >
                           {[1, 2, 3, 4, 5].map((star) => (
                             <button
-                              className={`friend-star${outfit.my_rating >= star ? " selected" : ""}`}
+                              className={`friend-star${displayedRating >= star ? " selected" : ""}`}
                               key={star}
                               type="button"
                               disabled={isOwnOutfit}
                               aria-label={`${star} ${star === 1 ? "star" : "stars"}`}
                               aria-pressed={outfit.my_rating === star}
+                              onMouseEnter={() => setFriendHoverRatings((current) => ({ ...current, [outfit.id]: star }))}
+                              onFocus={() => setFriendHoverRatings((current) => ({ ...current, [outfit.id]: star }))}
                               onClick={() => rateFriendFit(outfit.id, star)}
                             >
                               &#9733;
@@ -849,11 +1179,11 @@ export default function HomePage() {
                 </p>
 
                 <div className="hero-actions">
-                  <button type="button" className="primary-btn">
+                  <button type="button" className="primary-btn" onClick={openCameraPage}>
                     Start styling
                   </button>
-                  <button type="button" className="secondary-btn">
-                    My closet
+                  <button type="button" className="secondary-btn" onClick={() => setActiveTab("Saved")}>
+                    Saved looks
                   </button>
                 </div>
               </div>
@@ -876,26 +1206,31 @@ export default function HomePage() {
                     <p className="mini-label">Recommended now</p>
                     <h2>Trending looks</h2>
                   </div>
-                  <button type="button" className="link-btn">
+                  <button type="button" className="link-btn" onClick={openFriendsView}>
                     See all
                   </button>
                 </div>
 
+                {recommendedStatus === "loading" && <p className="style-guide-status" role="status">Loading looks…</p>}
+                {recommendedStatus === "error" && <p className="style-guide-error" role="alert">Could not load looks right now.</p>}
+                {recommendedStatus === "success" && recommended.length === 0 && (
+                  <p className="style-guide-status">No outfits posted yet.</p>
+                )}
                 <div className="recommend-grid">
-                  {recommendations.map((item) => (
-                    <article key={item.name} className="look-card">
+                  {recommended.map((outfit) => (
+                    <article key={outfit.id} className="look-card">
                       <div
                         className="look-image"
-                        style={{ backgroundImage: `url(${item.image})` }}
-                        aria-label={item.name}
+                        style={outfit.cover_image_url ? { backgroundImage: `url(${outfit.cover_image_url})` } : undefined}
+                        aria-label={outfit.title}
                       />
                       <div className="look-meta">
                         <div className="look-row">
-                          <span>{item.brand}</span>
-                          <strong>{item.price}</strong>
+                          <span>@{outfit.author?.username}</span>
+                          <strong>{outfit.rating_count ? `${Number(outfit.rating_avg).toFixed(1)} / 5` : "New"}</strong>
                         </div>
-                        <h3>{item.name}</h3>
-                        <p>{item.style}</p>
+                        <h3>{outfit.title}</h3>
+                        <p>{outfit.tags?.[0] || outfit.occasion || "Fresh look"}</p>
                       </div>
                     </article>
                   ))}
@@ -915,20 +1250,24 @@ export default function HomePage() {
                 <div className="saved-card">
                   <div className="section-header compact">
                     <h3>Saved looks</h3>
-                    <span>04</span>
+                    <span>{String(savedOutfits.length).padStart(2, "0")}</span>
                   </div>
 
-                  <ul>
-                    {savedLooks.map((look) => (
-                      <li key={look.name}>
-                        <span className="dot" aria-hidden="true" />
-                        <div>
-                          <strong>{look.name}</strong>
-                          <small>{look.time}</small>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
+                  {savedOutfits.length === 0 ? (
+                    <p className="style-guide-status">Nothing saved yet.</p>
+                  ) : (
+                    <ul>
+                      {savedOutfits.slice(0, 4).map((look) => (
+                        <li key={look.id}>
+                          <span className="dot" aria-hidden="true" />
+                          <div>
+                            <strong>{look.title}</strong>
+                            <small>@{look.author?.username}</small>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               </aside>
             </section>
@@ -943,21 +1282,31 @@ export default function HomePage() {
            
             </div>
 
+            {pastFitsStatus === "loading" && <p className="style-guide-status" role="status">Loading your fits…</p>}
+            {pastFitsStatus === "error" && <p className="style-guide-error" role="alert">{pastFitsError}</p>}
+            {pastFitsStatus === "success" && pastFits.length === 0 && (
+              <p className="style-guide-status">No fits yet. Take your first photo on Today's Fit!</p>
+            )}
+
             <div className="history-list">
-              {dummyPastFits.map((fit) => (
+              {pastFits.map((fit) => (
                 <article key={fit.id} className="history-item">
-                  <img className="history-image" src={fit.image} alt={`${fit.name} outfit`} />
+                  {fit.thumbnail ? (
+                    <img className="history-image" src={fit.thumbnail} alt={`${fit.targetStyle} outfit`} />
+                  ) : (
+                    <div className="history-image" role="img" aria-label="No photo saved" />
+                  )}
                   <div className="history-copy">
                     <div className="history-topline">
-                      <span>{fit.date}</span>
-                      <span className="tag">{fit.id}</span>
+                      <span>{new Date(fit.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</span>
+                      <span className="tag">{fit.detectedStyle || "style"}</span>
                     </div>
                     <div className="history-rating">
                       <span>Rating</span>
-                      <strong>{fit.rating.toFixed(1)} / 10</strong>
+                      <strong>{fit.score === null ? "—" : fit.score.toFixed(1)} / 10</strong>
                     </div>
-                    <h3>{fit.name}</h3>
-                    <p>{fit.styleWorn}</p>
+                    <h3>{fit.targetStyle}</h3>
+                    <p>{fit.verdict}</p>
                   </div>
                 </article>
               ))}
@@ -1041,6 +1390,12 @@ export default function HomePage() {
                     {!capturedFit && cameraStarted && cameraStatus === "ready" && (
                       <span className="camera-live"><span /> Camera is on</span>
                     )}
+                    {!capturedFit && cameraStarted && isPhotoCountdownActive && (
+                      <div className="camera-countdown-overlay" role="status" aria-live="assertive">
+                        <strong>{countdownRemaining}</strong>
+                        <span>Get ready</span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="camera-controls">
@@ -1049,6 +1404,25 @@ export default function HomePage() {
                         <span aria-hidden="true">⇄</span>
                         Switch camera
                       </button>
+                    )}
+                    {!capturedFit && cameraStarted && cameraStatus === "ready" && (
+                      <fieldset className="camera-countdown-picker" disabled={isPhotoCountdownActive}>
+                        <legend>Photo timer</legend>
+                        <div className="camera-countdown-options">
+                          {[3, 5, 10].map((seconds) => (
+                            <label key={seconds}>
+                              <input
+                                type="radio"
+                                name="photo-countdown"
+                                value={seconds}
+                                checked={photoCountdown === seconds}
+                                onChange={() => setPhotoCountdown(seconds)}
+                              />
+                              <span>{seconds} sec</span>
+                            </label>
+                          ))}
+                        </div>
+                      </fieldset>
                     )}
                     {capturedFit ? (
                       <>
@@ -1063,28 +1437,16 @@ export default function HomePage() {
                       <button
                         type="button"
                         className="primary-btn capture-button"
-                        onClick={captureFit}
+                        onClick={isPhotoCountdownActive ? cancelPhotoCountdown : startPhotoCountdown}
                         disabled={cameraStatus !== "ready"}
                       >
                         <span className="shutter-icon" aria-hidden="true" />
-                        Take fit photo
+                        {isPhotoCountdownActive ? "Cancel countdown" : "Take fit photo"}
                       </button>
                     ) : null}
-                    <span>Your photo is only sent when you tap Analyze, and it is not stored.</span>
-                  </div>
+                    </div>
                   {cameraSwitchMessage && <p className="camera-switch-message" role="status">{cameraSwitchMessage}</p>}
                 </section>
-
-                {analysisResult?.colors?.filter((color) => /^#[\da-f]{6}$/i.test(color)).slice(0, 4).length > 0 && (
-                  <div className="outfit-color-bar" role="img" aria-label="Outfit color palette">
-                    {analysisResult.colors
-                      .filter((color) => /^#[\da-f]{6}$/i.test(color))
-                      .slice(0, 4)
-                      .map((color, index) => (
-                        <span key={`${color}-${index}`} style={{ backgroundColor: color }} aria-hidden="true" />
-                      ))}
-                  </div>
-                )}
 
                 {capturedFit ? (
                   <section className="fit-feedback">
@@ -1181,9 +1543,11 @@ export default function HomePage() {
                 <section className="rating-card">
                   <p className="mini-label">Your style score</p>
                   <div className="rating-row">
-                    <strong>{analysisResult?.score ?? "—"}</strong>
+                    <strong>{fitScore === null ? "—" : fitScore.toFixed(1)}</strong>
                     <span>/ 10</span>
                   </div>
+                  {!capturedFit && <p>Take a photo of your fit to reveal your style score.</p>}
+                  {noOutfitDetected && <p role="status">No outfit detected. Try another photo with your full outfit in view.</p>}
                   {analysisResult?.verdict ? (
                     <p>{analysisResult.verdict}</p>
                   ) : capturedFit ? (
@@ -1207,14 +1571,12 @@ export default function HomePage() {
                   <div className="camera-card-heading">
                     <div>
                       <p className="mini-label">What is your fit giving?</p>
-                      {analysisResult?.fitGiving?.vibe && <h2>{analysisResult.fitGiving.vibe}</h2>}
                     </div>
                   </div>
-                  {analysisResult?.fitGiving?.closestStyle ? (
+                  {analysisResult?.detectedStyle && !noOutfitDetected ? (
                     <div className="gemini-style-match">
                       <p className="mini-label">Closest style match</p>
-                      <h3>{analysisResult.fitGiving.closestStyle}</h3>
-                      {analysisResult.fitGiving.reason && <p>{analysisResult.fitGiving.reason}</p>}
+                      <h3>{analysisResult.detectedStyle}</h3>
                     </div>
                   ) : null}
                 </section>
@@ -1252,6 +1614,45 @@ export default function HomePage() {
                 <dd>{email}</dd>
               </div>
             </dl>
+            {settingsDraft && (
+              <form className="account-settings-form" onSubmit={saveSettings}>
+                <label>
+                  Display name
+                  <input
+                    type="text"
+                    value={settingsDraft.display_name}
+                    maxLength={60}
+                    required
+                    onChange={(event) => setSettingsDraft((draft) => ({ ...draft, display_name: event.target.value }))}
+                  />
+                </label>
+                <label>
+                  Bio
+                  <textarea
+                    rows={3}
+                    value={settingsDraft.bio}
+                    maxLength={300}
+                    onChange={(event) => setSettingsDraft((draft) => ({ ...draft, bio: event.target.value }))}
+                  />
+                </label>
+                <label>
+                  Avatar image URL (leave empty for none)
+                  <input
+                    type="url"
+                    placeholder="https://…"
+                    value={settingsDraft.avatar_url}
+                    onChange={(event) => setSettingsDraft((draft) => ({ ...draft, avatar_url: event.target.value }))}
+                  />
+                </label>
+                {settingsError && <p className="style-guide-error" role="alert">{settingsError}</p>}
+                {settingsStatus === "saved" && <p className="style-guide-status" role="status">Saved.</p>}
+                <div className="account-settings-actions">
+                  <button className="primary-btn" type="submit" disabled={settingsStatus === "saving"}>
+                    {settingsStatus === "saving" ? "Saving…" : "Save changes"}
+                  </button>
+                </div>
+              </form>
+            )}
           </section>
         </div>
       )}

@@ -1,0 +1,38 @@
+[33m025e47f[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/jesiah[m[33m, [m[1;31morigin/HEAD[m[33m)[m Wiring up ... almost done chat - jesiah
+[33mad7eed3[m checkpoint progress, adding some cabling
+[33m7cb1ea1[m Merge branch 'main' of github.com:MHBoodram/CodeRedOrion27 into jesiah
+[33mb0b5a4c[m Jesiah checkpoint to da main
+[33ma4d636e[m Merge Matthew into jesiah: backend from Matthew, frontend from jesiah
+[33mdca6b64[m[33m ([m[1;31morigin/Matthew[m[33m)[m made some changes
+[33m8d1fcd9[m Resolve gemini.js conflict
+[33m04fe92b[m Resolve merge leftovers
+[33m12ae06e[m fixing an issue with files to run on vercel
+[33mab5218a[m Merge branch 'ELektra' of github.com:MHBoodram/CodeRedOrion27 into jesiah
+[33m14dedaf[m cleaning J w E branch merge conflict
+[33m265eedc[m snatching Tans chain styleguideapi
+[33m5caf083[m updating branch j
+[33md17a1c3[m Merge branch 'Matthew'
+[33m2a48ccf[m Merge branch 'main' of https://github.com/MHBoodram/CodeRedOrion27
+[33m58c338c[m fixed merge conflict, will rollback if needed
+[33mf59a3a1[m connected the backend and the frontend, working on making sure ai will be implemented
+[33m9db646b[m phase 1 wiring est
+[33mf21d757[m Merge branch 'jesiah' of https://github.com/MHBoodram/CodeRedOrion27 into Matthew
+[33m3049fea[m Pulled from E to j
+[33m8571b0d[m added vercel.json
+[33md35abec[m Added Gemini API
+[33m3de820e[m stop tracking bloat node_modules
+[33m4d2593b[m Finishing up front end items, added dummy notif bar, and Friends side bar
+[33m806a465[m merge w matt, keep .gitignore
+[33m5185f30[m Checkpoint -- UI Edits
+[33medc8ad8[m Saving changes -- edited main page, conv photos to assets
+[33m5da7db0[m update .gitignore
+[33ma7c1230[m finished merge from backend files from branch Matthew
+[33m8423f45[m Merge remote-tracking branch 'origin/main' into Matthew
+[33m51f0f42[m fixed the damn folder system
+[33m9e739f2[m Add friendly root route to API
+[33m368bbd3[m added backend dummy data
+[33mbfc63e5[m setting up backend
+[33m3bf157f[m connected to the DB
+[33m5f3e281[m setting up DB, making sure .gitignore works
+[33m7e97093[m :erge branch 'main' of https://github.com/MHBoodram/CodeRedOrion27
+[33md47e362[m initial commit

@@ -3,6 +3,7 @@ const { z } = require('zod');
 const db = require('../db');
 const { HttpError, validate } = require('../errors');
 const { requireAuth, optionalAuth } = require('../middleware/auth');
+const { notify } = require('../lib/notify');
 const {
   VISIBLE, OUTFIT_SELECT, getOutfit, assertVisible, setItems, setTags, logEvent,
 } = require('../lib/outfitQueries');
@@ -150,7 +151,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
 // ---------------------------------------------------------------- ratings
 router.put('/:id/rating', requireAuth, validate(ratingSchema), async (req, res) => {
   const { score } = req.valid;
-  await assertVisible(req.params.id, req.user.id);
+  const outfit = await assertVisible(req.params.id, req.user.id);
   try {
     await db.query(
       `INSERT INTO ratings (outfit_id, user_id, score) VALUES ($1::uuid, $2::uuid, $3)
@@ -162,6 +163,7 @@ router.put('/:id/rating', requireAuth, validate(ratingSchema), async (req, res) 
     throw err;
   }
   logEvent(req.params.id, req.user.id, 'rating', score);
+  await notify({ userId: outfit.user_id, actorId: req.user.id, type: 'rating', outfitId: req.params.id, detail: String(score) });
   const { rows } = await db.query(
     'SELECT rating_count, rating_avg::float8 AS rating_avg FROM outfits WHERE id = $1::uuid',
     [req.params.id]
@@ -196,7 +198,7 @@ router.get('/:id/comments', optionalAuth, async (req, res) => {
 
 router.post('/:id/comments', requireAuth, validate(commentSchema), async (req, res) => {
   const { body, parent_id } = req.valid;
-  await assertVisible(req.params.id, req.user.id);
+  const outfit = await assertVisible(req.params.id, req.user.id);
   if (parent_id) {
     const { rows } = await db.query(
       'SELECT 1 FROM comments WHERE id = $1::uuid AND outfit_id = $2::uuid',
@@ -210,6 +212,7 @@ router.post('/:id/comments', requireAuth, validate(commentSchema), async (req, r
     [req.params.id, req.user.id, parent_id || null, body]
   );
   logEvent(req.params.id, req.user.id, 'comment');
+  await notify({ userId: outfit.user_id, actorId: req.user.id, type: 'comment', outfitId: req.params.id, detail: body.slice(0, 120) });
   res.status(201).json({ comment: rows[0] });
 });
 

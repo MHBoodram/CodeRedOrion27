@@ -6,6 +6,15 @@ const db = require('../src/db');
 const { setItems, setTags } = require('../src/lib/outfitQueries');
 
 const PASSWORD = 'password123';
+// Outfit cover photos: files in client/public/photos, served by the client at /photos/...
+const PHOTOS = [
+  'autumn-fits.jpg',
+  'oversized-streetwear.jpg',
+  'leeyjohn-fits.jpg',
+  'winter-budget.jpg',
+  'xiaoxiao-outfits.jpg',
+];
+const photo = (i) => `/photos/${PHOTOS[i % PHOTOS.length]}`;
 const img = (text) => `https://placehold.co/600x800?text=${encodeURIComponent(text)}`;
 
 const users = [
@@ -74,11 +83,26 @@ const comments = [
 ];
 
 async function main() {
+  const { rows: existingAdmin } = await db.query('SELECT 1 FROM users WHERE username = $1', ['admin']);
+  if (!existingAdmin.length) {
+    const adminHash = await bcrypt.hash(PASSWORD, 10);
+    await db.query(
+      `INSERT INTO users (username, email, password_hash, display_name, bio, avatar_url)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      ['admin', 'admin@example.com', adminHash, 'FitCheck Admin', 'Demo account for local development.', img('admin')]
+    );
+    console.log('Seeded demo login "admin".');
+  }
+
   const { rows: existing } = await db.query('SELECT 1 FROM users WHERE username = ANY($1)', [
     users.map((u) => u.username),
   ]);
-  if (existing.length) {
-    console.log('Demo users already exist, skipping seed.');
+  if (existing.length && process.argv.includes('--reset')) {
+    // Deleting the users cascades to their items, outfits, ratings, comments and follows.
+    await db.query('DELETE FROM users WHERE username = ANY($1)', [users.map((u) => u.username)]);
+    console.log('Removed existing demo users.');
+  } else if (existing.length) {
+    console.log('Demo users already exist, skipping seed. Re-run with --reset to rebuild them.');
     return;
   }
 
@@ -109,11 +133,11 @@ async function main() {
     }
 
     const outfitIds = [];
-    for (const o of outfits) {
+    for (const [outfitIndex, o] of outfits.entries()) {
       const { rows } = await c.query(
         `INSERT INTO outfits (user_id, title, description, cover_image_url, occasion, season, visibility, created_at)
          VALUES ($1, $2, $3, $4, $5, $6, 'public', now() - (random() * interval '14 days')) RETURNING id`,
-        [userId[o.user], o.title, `${o.title}: a ${o.occasion} look for ${o.season}.`, img(o.title), o.occasion, o.season]
+        [userId[o.user], o.title, `${o.title}: a ${o.occasion} look for ${o.season}.`, photo(outfitIndex), o.occasion, o.season]
       );
       const id = rows[0].id;
       outfitIds.push(id);
@@ -153,7 +177,7 @@ async function main() {
   });
 
   console.log(`Seeded ${users.length} users and ${outfits.length} outfits.`);
-  console.log(`Log in with username "alice" (or bob, carla, dev) and password "${PASSWORD}".`);
+  console.log(`Log in with username "admin" (or alice, bob, carla, dev) and password "${PASSWORD}".`);
 }
 
 main()

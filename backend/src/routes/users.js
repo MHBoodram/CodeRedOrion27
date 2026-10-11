@@ -4,12 +4,13 @@ const db = require('../db');
 const { HttpError, validate } = require('../errors');
 const { requireAuth, optionalAuth } = require('../middleware/auth');
 const { VISIBLE, OUTFIT_SELECT } = require('../lib/outfitQueries');
+const { notify } = require('../lib/notify');
 
 const patchSchema = z
   .object({
     display_name: z.string().trim().min(1).max(60),
     bio: z.string().trim().max(300),
-    avatar_url: z.string().url(),
+    avatar_url: z.union([z.string().url(), z.literal('')]), // '' clears it
   })
   .partial()
   .refine((o) => Object.keys(o).length > 0, { message: 'No fields to update' });
@@ -25,7 +26,7 @@ router.patch('/me', requireAuth, validate(patchSchema), async (req, res) => {
   const b = req.valid;
   const { rows } = await db.query(
     `UPDATE users SET display_name = COALESCE($2, display_name), bio = COALESCE($3, bio),
-            avatar_url = COALESCE($4, avatar_url)
+            avatar_url = CASE WHEN $4::text = '' THEN NULL ELSE COALESCE($4::text, avatar_url) END
      WHERE id = $1 RETURNING id, username, email, display_name, avatar_url, bio, created_at`,
     [req.user.id, b.display_name, b.bio, b.avatar_url]
   );
@@ -64,10 +65,11 @@ router.post('/:username/follow', requireAuth, async (req, res) => {
   const { rows } = await db.query('SELECT id FROM users WHERE username = $1', [req.params.username]);
   if (!rows[0]) throw new HttpError(404, 'User not found');
   if (rows[0].id === req.user.id) throw new HttpError(400, "You can't follow yourself");
-  await db.query(
+  const inserted = await db.query(
     'INSERT INTO follows (follower_id, following_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
     [req.user.id, rows[0].id]
   );
+  if (inserted.rowCount) await notify({ userId: rows[0].id, actorId: req.user.id, type: 'follow' });
   res.json({ following: true });
 });
 
