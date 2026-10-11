@@ -1,0 +1,102 @@
+export const dummyPastFits = [
+  {
+    id: "FIT-024",
+    date: "Apr 24, 2026",
+    name: "Velvet dusk",
+    styleWorn: "Dark evening tailoring with a velvet accent",
+    rating: 8.6,
+    image: "/photos/leeyjohn_%20IG%20fits.jpg",
+  },
+  {
+    id: "FIT-018",
+    date: "Apr 18, 2026",
+    name: "Café neutral",
+    styleWorn: "Relaxed streetwear in soft, warm neutrals",
+    rating: 9.1,
+    image: "/photos/Oversized%20Streetwear%20Outfit%20for%20Men%20_%20Baggy%20Fashion%20Inspiration.jpg",
+  },
+  {
+    id: "FIT-009",
+    date: "Apr 09, 2026",
+    name: "Studio soft",
+    styleWorn: "Autumn layers with clean, tailored lines",
+    rating: 8.3,
+    image: "/photos/Autumn%20Fits.jpg",
+  },
+  {
+    id: "FIT-031",
+    date: "Mar 31, 2026",
+    name: "Rainy day edit",
+    styleWorn: "Cozy winter layers built for a cool-weather day",
+    rating: 9.4,
+    image: "/photos/Winter%20outfit%20under%20budget.jpg",
+  },
+];
+
+export const dummyFriends = [
+  {
+    id: "friend-maya",
+    username: "maya.moves",
+    postedAt: "Today, 9:12 AM",
+    fitName: "Weekend layers",
+    styleWorn: "Relaxed denim with soft, oversized layers",
+    fitScore: 9.2,
+    photo: "/photos/leeyjohn_%20IG%20fits.jpg",
+    comments: [{ id: "maya-comment-1", username: "lena.style", text: "The layering works so well." }],
+  },
+  {
+    id: "friend-jordan",
+    username: "jordan.in.motion",
+    postedAt: "Yesterday, 4:38 PM",
+    fitName: "City uniform",
+    styleWorn: "Oversized streetwear with an easy monochrome palette",
+    fitScore: 8.7,
+    photo: "/photos/Oversized%20Streetwear%20Outfit%20for%20Men%20_%20Baggy%20Fashion%20Inspiration.jpg",
+    comments: [{ id: "jordan-comment-1", username: "maya.moves", text: "Great proportions on this one." }],
+  },
+  {
+    id: "friend-nina",
+    username: "nina.afterhours",
+    postedAt: "Monday, 7:06 PM",
+    fitName: "Autumn edit",
+    styleWorn: "Warm seasonal tones with a clean tailored shape",
+    fitScore: 9.5,
+    photo: "/photos/Autumn%20Fits.jpg",
+    comments: [{ id: "nina-comment-1", username: "jordan.in.motion", text: "Love this color story." }],
+  },
+];
+
+export const dummyNotifications = [
+  {
+    id: "notification-friend-maya",
+    type: "New friend",
+    actor: "maya.moves",
+    message: "Added you as a friend.",
+    time: "5 min ago",
+    read: false,
+  },
+  {
+    id: "notification-rating-jordan",
+    type: "New rating",
+    actor: "jordan.in.motion",
+    message: "Rated your outfit 5 out of 5 stars.",
+    time: "22 min ago",
+    read: false,
+  },
+  {
+    id: "notification-comment-nina",
+    type: "New comment",
+    actor: "nina.afterhours",
+    message: "Left a comment on your outfit.",
+    time: "1 hour ago",
+    read: false,
+  },
+  {
+    id: "notification-photo-maya",
+    type: "New outfit",
+    actor: "maya.moves",
+    message: "Posted a new outfit photo.",
+    time: "3 hours ago",
+    read: false,
+  },
+];
