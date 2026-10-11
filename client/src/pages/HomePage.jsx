@@ -726,7 +726,6 @@ export default function HomePage() {
                   value={stylePrompt}
                   onChange={(event) => setStylePrompt(event.target.value)}
                   placeholder="e.g. relaxed autumn streetwear in warm neutrals"
-                  placeholder="e.g. streetwear, gothic, bohemian"
                   maxLength={120}
                   required
                 />
@@ -797,14 +796,11 @@ export default function HomePage() {
               {dummyFriends.map((friend) => {
                 const feedback = friendFeedback[friend.id] || {};
                 const comments = [...friend.comments, ...(feedback.comments || [])];
-                return (
-                  <article className="friend-card" key={friend.id}>
-                    <header className="friend-card-header">
-                      <div className="friend-avatar" aria-hidden="true">{friend.username.slice(0, 2).toUpperCase()}</div>
                 const displayedRating = friendHoverRatings[friend.id] ?? feedback.rating ?? 0;
                 return (
                   <article className="friend-card" key={friend.id}>
                     <header className="friend-card-header">
+                      <div className="friend-avatar" aria-hidden="true">{friend.username.slice(0, 2).toUpperCase()}</div>
                       <div>
                         <h2>{friend.username}</h2>
                         <time>{friend.postedAt}</time>
@@ -814,7 +810,6 @@ export default function HomePage() {
                     <div className="friend-card-details">
                       <h3>{friend.fitName}</h3>
                       <p className="friend-fit-score"><span>Fit score</span><strong>{friend.fitScore.toFixed(1)} / 10</strong></p>
-                      <p className="friend-fit-score"><span>Fit score</span><strong>{friend.fitScore.toFixed(1)} / 5</strong></p>
                       <p className="friend-style-worn">{friend.styleWorn}</p>
 
                       <section className="friend-rating-section" aria-label={`Rate ${friend.username}'s outfit`}>
@@ -822,10 +817,6 @@ export default function HomePage() {
                           <span>Your rating</span>
                           <output>{feedback.rating ? `${feedback.rating} / 5` : "Not rated"}</output>
                         </div>
-                        <div className="friend-stars" role="group" aria-label={`Rate ${friend.username} out of five stars`}>
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <button
-                              className={`friend-star${feedback.rating >= star ? " selected" : ""}`}
                         <div
                           className="friend-stars"
                           role="group"
