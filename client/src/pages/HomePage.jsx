@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import girlLogo from "../assets/Girl(6).svg";
 import WeatherBadge from "../components/WeatherBadge.jsx";
+import { dummyFriends, dummyNotifications, dummyPastFits } from "../data/dummyDatabase.js";
 import { requestStyleMoodboard } from "../styleGuideApi.js";
 import "./HomePage.css";
 
-const navItems = ["Today's Fit", "Style Guide", "Past Fits"];
+const navItems = ["Today's Fit", "Past Fits", "Friends", "Style Guide"];
 
 const recommendations = [
   {
@@ -38,13 +39,6 @@ const savedLooks = [
   { name: "Cinnamon layers", time: "2h ago" },
   { name: "Weekend ease", time: "1d ago" },
   { name: "City minimal", time: "3d ago" },
-];
-
-const previousFits = [
-  { name: "Velvet dusk", date: "Apr 24, 2026", vibe: "Late dinner glow" },
-  { name: "Café neutral", date: "Apr 18, 2026", vibe: "Effortless layers" },
-  { name: "Studio soft", date: "Apr 09, 2026", vibe: "Clean tailoring" },
-  { name: "Rainy day edit", date: "Mar 31, 2026", vibe: "Warm and grounded" },
 ];
 
 const similarStyles = [
@@ -86,6 +80,7 @@ function getCurrentEmail() {
 
 export default function HomePage() {
   const username = getCurrentUsername();
+  const friendFeedbackKey = `fitcheck-friend-feedback:${username}`;
   const email = getCurrentEmail();
   const usernameInitials = username.slice(0, 2).toUpperCase();
   const navigate = useNavigate();
@@ -94,8 +89,18 @@ export default function HomePage() {
   const [styleMoodboard, setStyleMoodboard] = useState(null);
   const [styleGuideStatus, setStyleGuideStatus] = useState("idle");
   const [styleGuideError, setStyleGuideError] = useState("");
+  const [friendFeedback, setFriendFeedback] = useState(() => {
+    try {
+      return JSON.parse(window.localStorage.getItem(friendFeedbackKey) || "{}");
+    } catch {
+      return {};
+    }
+  });
+  const [friendCommentDrafts, setFriendCommentDrafts] = useState({});
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isNotificationMenuOpen, setIsNotificationMenuOpen] = useState(false);
+  const [notifications, setNotifications] = useState(dummyNotifications);
   const [cameraStarted, setCameraStarted] = useState(false);
   const [cameraStatus, setCameraStatus] = useState("idle");
   const [cameraError, setCameraError] = useState("");
@@ -107,11 +112,47 @@ export default function HomePage() {
   const cameraDevicesRef = useRef([]);
   const cameraSessionRef = useRef(0);
   const accountMenuRef = useRef(null);
+  const notificationMenuRef = useRef(null);
   const accountMenuCloseTimerRef = useRef(null);
 
   const isHistoryView = activeTab === "Past Fits";
   const isStyleGuideView = activeTab === "Style Guide";
   const isCameraView = activeTab === "Camera";
+  const isFriendsView = activeTab === "Friends";
+  const unreadNotificationCount = notifications.filter((notification) => !notification.read).length;
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(friendFeedbackKey, JSON.stringify(friendFeedback));
+    } catch {
+      // Keep feedback in the current view if browser storage is unavailable.
+    }
+  }, [friendFeedback, friendFeedbackKey]);
+
+  function rateFriendFit(friendId, rating) {
+    setFriendFeedback((current) => ({
+      ...current,
+      [friendId]: { ...current[friendId], rating },
+    }));
+  }
+
+  function addFriendComment(event, friendId) {
+    event.preventDefault();
+    const text = friendCommentDrafts[friendId]?.trim();
+    if (!text) return;
+
+    setFriendFeedback((current) => {
+      const feedback = current[friendId] || {};
+      return {
+        ...current,
+        [friendId]: {
+          ...feedback,
+          comments: [...(feedback.comments || []), { id: `${Date.now()}`, username, text }],
+        },
+      };
+    });
+    setFriendCommentDrafts((current) => ({ ...current, [friendId]: "" }));
+  }
 
   function openAccountMenu() {
     window.clearTimeout(accountMenuCloseTimerRef.current);
@@ -126,19 +167,23 @@ export default function HomePage() {
   }
 
   useEffect(() => {
-    if (!isAccountMenuOpen && !isSettingsOpen) return undefined;
+    if (!isAccountMenuOpen && !isSettingsOpen && !isNotificationMenuOpen) return undefined;
 
     function closeAccountOverlays(event) {
       if (event.key === "Escape") {
         window.clearTimeout(accountMenuCloseTimerRef.current);
         setIsAccountMenuOpen(false);
         setIsSettingsOpen(false);
+        setIsNotificationMenuOpen(false);
         return;
       }
 
       if (event.type === "pointerdown" && !accountMenuRef.current?.contains(event.target)) {
         window.clearTimeout(accountMenuCloseTimerRef.current);
         setIsAccountMenuOpen(false);
+      }
+      if (event.type === "pointerdown" && !notificationMenuRef.current?.contains(event.target)) {
+        setIsNotificationMenuOpen(false);
       }
     }
 
@@ -149,7 +194,13 @@ export default function HomePage() {
       window.removeEventListener("keydown", closeAccountOverlays);
       window.clearTimeout(accountMenuCloseTimerRef.current);
     };
-  }, [isAccountMenuOpen, isSettingsOpen]);
+  }, [isAccountMenuOpen, isSettingsOpen, isNotificationMenuOpen]);
+
+  function markNotificationRead(notificationId) {
+    setNotifications((current) => current.map((notification) => (
+      notification.id === notificationId ? { ...notification, read: true } : notification
+    )));
+  }
 
   useEffect(() => {
     if (!isCameraView || !cameraStarted) return undefined;
@@ -392,6 +443,59 @@ export default function HomePage() {
 
       <main className="main-panel">
         <header className="topbar">
+          <div className="notification-menu" ref={notificationMenuRef}>
+            <button
+              className="notification-trigger"
+              type="button"
+              aria-label={`Notifications${unreadNotificationCount ? `, ${unreadNotificationCount} unread` : ""}`}
+              aria-haspopup="menu"
+              aria-expanded={isNotificationMenuOpen}
+              title="Notifications"
+              onClick={() => {
+                setIsAccountMenuOpen(false);
+                setIsNotificationMenuOpen((open) => !open);
+              }}
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" />
+              </svg>
+              {unreadNotificationCount > 0 && (
+                <span className="notification-count">{unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}</span>
+              )}
+            </button>
+            {isNotificationMenuOpen && (
+              <div className="notification-dropdown" role="menu" aria-label="Notifications">
+                <header className="notification-dropdown-header">
+                  <h2>Notifications</h2>
+                  <span>{unreadNotificationCount} new</span>
+                </header>
+                {notifications.length ? (
+                  <ul>
+                    {notifications.map((notification) => (
+                      <li key={notification.id}>
+                        <button
+                          className={`notification-item${notification.read ? "" : " unread"}`}
+                          type="button"
+                          role="menuitem"
+                          onClick={() => markNotificationRead(notification.id)}
+                        >
+                          <span className="notification-type">{notification.type}</span>
+                          <span className="notification-copy">
+                            <strong>{notification.actor}</strong>
+                            <span>{notification.message}</span>
+                            <time>{notification.time}</time>
+                          </span>
+                          {!notification.read && <span className="notification-unread-dot" aria-label="Unread" />}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="notification-empty">You’re all caught up.</p>
+                )}
+              </div>
+            )}
+          </div>
           <div
             className="account-menu"
             ref={accountMenuRef}
@@ -510,6 +614,82 @@ export default function HomePage() {
               </section>
             )}
           </section>
+        ) : isFriendsView ? (
+          <section className="friends-page" aria-labelledby="friends-heading">
+            <header className="friends-page-header">
+              <p className="mini-label">Community</p>
+              <h1 id="friends-heading">Friends</h1>
+              <p>See what your friends are wearing and share your take.</p>
+            </header>
+            <div className="friends-grid">
+              {dummyFriends.map((friend) => {
+                const feedback = friendFeedback[friend.id] || {};
+                const comments = [...friend.comments, ...(feedback.comments || [])];
+                return (
+                  <article className="friend-card" key={friend.id}>
+                    <header className="friend-card-header">
+                      <div className="friend-avatar" aria-hidden="true">{friend.username.slice(0, 2).toUpperCase()}</div>
+                      <div>
+                        <h2>{friend.username}</h2>
+                        <time>{friend.postedAt}</time>
+                      </div>
+                    </header>
+                    <img className="friend-photo" src={friend.photo} alt={`${friend.username} wearing ${friend.fitName}`} />
+                    <div className="friend-card-details">
+                      <h3>{friend.fitName}</h3>
+                      <p className="friend-fit-score"><span>Fit score</span><strong>{friend.fitScore.toFixed(1)} / 10</strong></p>
+                      <p className="friend-style-worn">{friend.styleWorn}</p>
+
+                      <section className="friend-rating-section" aria-label={`Rate ${friend.username}'s outfit`}>
+                        <div className="friend-rating-heading">
+                          <span>Your rating</span>
+                          <output>{feedback.rating ? `${feedback.rating} / 5` : "Not rated"}</output>
+                        </div>
+                        <div className="friend-stars" role="group" aria-label={`Rate ${friend.username} out of five stars`}>
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <button
+                              className={`friend-star${feedback.rating >= star ? " selected" : ""}`}
+                              key={star}
+                              type="button"
+                              aria-label={`${star} ${star === 1 ? "star" : "stars"}`}
+                              aria-pressed={feedback.rating === star}
+                              onClick={() => rateFriendFit(friend.id, star)}
+                            >
+                              &#9733;
+                            </button>
+                          ))}
+                        </div>
+                      </section>
+
+                      <section className="friend-comments" aria-label={`Comments on ${friend.username}'s fit`}>
+                        <h4>Comments</h4>
+                        <ul>
+                          {comments.map((comment) => (
+                            <li key={comment.id}><strong>{comment.username}</strong><p>{comment.text}</p></li>
+                          ))}
+                        </ul>
+                        <form className="friend-comment-form" onSubmit={(event) => addFriendComment(event, friend.id)}>
+                          <label htmlFor={`friend-comment-${friend.id}`}>Add a comment</label>
+                          <input
+                            id={`friend-comment-${friend.id}`}
+                            type="text"
+                            value={friendCommentDrafts[friend.id] || ""}
+                            onChange={(event) => setFriendCommentDrafts((current) => ({ ...current, [friend.id]: event.target.value }))}
+                            placeholder="What do you think?"
+                            autoComplete="off"
+                            maxLength="240"
+                          />
+                          <button className="secondary-btn" type="submit" disabled={!friendCommentDrafts[friend.id]?.trim()}>
+                            Comment
+                          </button>
+                        </form>
+                      </section>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
         ) : !isHistoryView && !isCameraView ? (
           <>
             <section className="hero-panel">
@@ -610,35 +790,27 @@ export default function HomePage() {
           <section className="history-panel">
             <div className="section-header history-header">
               <div>
-                <p className="mini-label">Your timeline</p>
-                <h2>Previous fits</h2>
+                <p className="mini-label">Your History</p>
+                <h2>Your past fits</h2>
               </div>
-              <button type="button" className="link-btn">
-                Export moodboard
-              </button>
+           
             </div>
 
             <div className="history-list">
-              {previousFits.map((fit, index) => (
-                <article key={fit.name} className="history-item">
-                  <div
-                    className="history-image"
-                    style={{
-                      backgroundImage: `url(https://images.unsplash.com/${[
-                        "photo-1529139574466-a303027c1d8b",
-                        "photo-1524504388940-b1c1722653e1",
-                        "photo-1483985988355-763728e1935b",
-                        "photo-1496747611176-843222e1e57c",
-                      ][index]}?auto=format&fit=crop&w=900&q=80)`,
-                    }}
-                  />
+              {dummyPastFits.map((fit) => (
+                <article key={fit.id} className="history-item">
+                  <img className="history-image" src={fit.image} alt={`${fit.name} outfit`} />
                   <div className="history-copy">
                     <div className="history-topline">
                       <span>{fit.date}</span>
-                      <span className="tag">Fit #{index + 1}</span>
+                      <span className="tag">{fit.id}</span>
+                    </div>
+                    <div className="history-rating">
+                      <span>Rating</span>
+                      <strong>{fit.rating.toFixed(1)} / 10</strong>
                     </div>
                     <h3>{fit.name}</h3>
-                    <p>{fit.vibe}</p>
+                    <p>{fit.styleWorn}</p>
                   </div>
                 </article>
               ))}
@@ -822,21 +994,6 @@ export default function HomePage() {
           </section>
         )}
       </main>
-
-      {!isCameraView && (
-        <button
-          type="button"
-          className="camera-launcher"
-          onClick={openCameraPage}
-          aria-label="Open camera to try on a fit"
-        >
-          <svg aria-hidden="true" viewBox="0 0 24 24">
-            <path d="M4 7.5h3l1.4-2h7.2l1.4 2h3A1.5 1.5 0 0 1 21.5 9v9a1.5 1.5 0 0 1-1.5 1.5H4A1.5 1.5 0 0 1 2.5 18V9A1.5 1.5 0 0 1 4 7.5Z" />
-            <circle cx="12" cy="13.5" r="3.5" />
-          </svg>
-          <span>Try on with camera</span>
-        </button>
-      )}
 
       {isSettingsOpen && (
         <div className="account-settings-backdrop" onClick={() => setIsSettingsOpen(false)}>
