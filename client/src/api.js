@@ -1,6 +1,8 @@
 // Merged api client (jesiah + Matthew).
 // api("/auth/login", opts) prefixes /api; api.register/login/me are shortcuts.
-const API_URL = String(import.meta.env.VITE_API_URL || "https://virpals.online").replace(/\/+$/, "");
+const API_URL = String(
+  import.meta.env.VITE_API_URL || (import.meta.env.DEV ? "" : "https://virpals.online"),
+).replace(/\/+$/, "");
 const TOKEN_KEY = "fitcheck-token";
 
 export class ApiError extends Error {
