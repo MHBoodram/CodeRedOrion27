@@ -127,6 +127,7 @@ export default function HomePage() {
     }
   });
   const [friendCommentDrafts, setFriendCommentDrafts] = useState({});
+  const [friendHoverRatings, setFriendHoverRatings] = useState({});
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isNotificationMenuOpen, setIsNotificationMenuOpen] = useState(false);
@@ -155,6 +156,9 @@ export default function HomePage() {
   const isCameraView = activeTab === "Camera";
   const isFriendsView = activeTab === "Friends";
   const unreadNotificationCount = notifications.filter((notification) => !notification.read).length;
+  const fitRatingOutOfFive = typeof analysisResult?.score === "number"
+    ? Math.max(0, Math.min(5, analysisResult.score / 2))
+    : null;
 
   useEffect(() => {
     try {
@@ -709,16 +713,16 @@ export default function HomePage() {
             <header className="friends-page-header">
               <p className="mini-label">Community</p>
               <h1 id="friends-heading">Friends</h1>
-              <p>See what your friends are wearing and share your take.</p>
+              <p>See what your friends are wearing today and share your take.</p>
             </header>
             <div className="friends-grid">
               {dummyFriends.map((friend) => {
                 const feedback = friendFeedback[friend.id] || {};
                 const comments = [...friend.comments, ...(feedback.comments || [])];
+                const displayedRating = friendHoverRatings[friend.id] ?? feedback.rating ?? 0;
                 return (
                   <article className="friend-card" key={friend.id}>
                     <header className="friend-card-header">
-                      <div className="friend-avatar" aria-hidden="true">{friend.username.slice(0, 2).toUpperCase()}</div>
                       <div>
                         <h2>{friend.username}</h2>
                         <time>{friend.postedAt}</time>
@@ -727,7 +731,7 @@ export default function HomePage() {
                     <img className="friend-photo" src={friend.photo} alt={`${friend.username} wearing ${friend.fitName}`} />
                     <div className="friend-card-details">
                       <h3>{friend.fitName}</h3>
-                      <p className="friend-fit-score"><span>Fit score</span><strong>{friend.fitScore.toFixed(1)} / 10</strong></p>
+                      <p className="friend-fit-score"><span>Fit score</span><strong>{friend.fitScore.toFixed(1)} / 5</strong></p>
                       <p className="friend-style-worn">{friend.styleWorn}</p>
 
                       <section className="friend-rating-section" aria-label={`Rate ${friend.username}'s outfit`}>
@@ -735,14 +739,34 @@ export default function HomePage() {
                           <span>Your rating</span>
                           <output>{feedback.rating ? `${feedback.rating} / 5` : "Not rated"}</output>
                         </div>
-                        <div className="friend-stars" role="group" aria-label={`Rate ${friend.username} out of five stars`}>
+                        <div
+                          className="friend-stars"
+                          role="group"
+                          aria-label={`Rate ${friend.username} out of five stars`}
+                          onMouseLeave={() => setFriendHoverRatings((current) => {
+                            const next = { ...current };
+                            delete next[friend.id];
+                            return next;
+                          })}
+                          onBlur={(event) => {
+                            if (!event.currentTarget.contains(event.relatedTarget)) {
+                              setFriendHoverRatings((current) => {
+                                const next = { ...current };
+                                delete next[friend.id];
+                                return next;
+                              });
+                            }
+                          }}
+                        >
                           {[1, 2, 3, 4, 5].map((star) => (
                             <button
-                              className={`friend-star${feedback.rating >= star ? " selected" : ""}`}
+                              className={`friend-star${displayedRating >= star ? " selected" : ""}`}
                               key={star}
                               type="button"
                               aria-label={`${star} ${star === 1 ? "star" : "stars"}`}
                               aria-pressed={feedback.rating === star}
+                              onMouseEnter={() => setFriendHoverRatings((current) => ({ ...current, [friend.id]: star }))}
+                              onFocus={() => setFriendHoverRatings((current) => ({ ...current, [friend.id]: star }))}
                               onClick={() => rateFriendFit(friend.id, star)}
                             >
                               &#9733;
@@ -1088,10 +1112,14 @@ export default function HomePage() {
                 <section className="rating-card">
                   <p className="mini-label">Your style score</p>
                   <div className="rating-row">
-                    <strong>{analysisResult?.score ?? "—"}</strong>
-                    <span>/ 10</span>
+                    <strong>{fitRatingOutOfFive === null ? "—" : fitRatingOutOfFive.toFixed(1)}</strong>
+                    <span>/ 5</span>
                   </div>
-                  <p>{analysisResult?.verdict || (capturedFit ? "Enter a target style to get outfit feedback." : "Take a photo of your fit to reveal your style score.")}</p>
+                  {analysisResult?.verdict ? (
+                    <p>{analysisResult.verdict}</p>
+                  ) : capturedFit ? (
+                    <p>Enter a target style to get outfit feedback.</p>
+                  ) : null}
                   {analysisResult?.whatsWorking?.length > 0 && (
                     <div className="score-notes">
                       <h3>What’s working</h3>
@@ -1109,7 +1137,7 @@ export default function HomePage() {
                 <section className="similar-card">
                   <div className="camera-card-heading">
                     <div>
-                      <p className="mini-label">What is your fit giving?</p>
+                      <p className="mini-label">What's your fit giving?</p>
                       {analysisResult?.fitGiving?.vibe && <h2>{analysisResult.fitGiving.vibe}</h2>}
                     </div>
                   </div>

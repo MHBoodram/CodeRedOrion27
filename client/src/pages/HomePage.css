@@ -1113,18 +1113,6 @@
   padding: 12px;
 }
 
-.friend-avatar {
-  display: grid;
-  width: 38px;
-  height: 38px;
-  flex: 0 0 38px;
-  place-items: center;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--lilac-ash), #d7c2d0);
-  color: var(--bg-deep);
-  font-weight: 700;
-}
-
 .friend-card-header h2 {
   margin: 0;
   color: var(--text);
@@ -1213,6 +1201,7 @@
   font: inherit;
   font-size: 1.55rem;
   line-height: 1;
+  transition: color 120ms ease;
 }
 
 .friend-star.selected {
@@ -1380,6 +1369,49 @@
   padding: 22px 20px;
 }
 
+.camera-page .camera-stage,
+.camera-page .fit-feedback,
+.camera-page .camera-side-column > section {
+  box-shadow: 0 12px 30px rgba(10, 3, 6, 0.3), 0 2px 8px rgba(176, 145, 159, 0.08);
+}
+
+.camera-page .mini-label {
+  font-size: 0.76rem;
+}
+
+.camera-page p:not(.mini-label) {
+  font-size: 1.06rem;
+}
+
+.camera-page .camera-page-header h1 {
+  font-size: clamp(2.5rem, 4.5vw, 3.4rem);
+}
+
+.camera-page .camera-start-choices p {
+  font-size: 1.35rem;
+}
+
+.camera-page .camera-controls {
+  font-size: 0.96rem;
+}
+
+.camera-page .weather-temperature {
+  font-size: clamp(2.2rem, 3.2vw, 3.1rem);
+}
+
+.camera-page .weather-description,
+.camera-page .weather-details {
+  font-size: 1rem;
+}
+
+.camera-page .rating-row strong {
+  font-size: 2.8rem;
+}
+
+.camera-page .camera-card-heading h2 {
+  font-size: 1.4rem;
+}
+
 .camera-page-header {
   display: flex;
   justify-content: space-between;
@@ -1492,6 +1524,31 @@
   gap: 12px;
 }
 
+.camera-start-actions button {
+  min-width: 154px;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 8px;
+  transition: transform 140ms ease, box-shadow 140ms ease, filter 140ms ease, border-color 140ms ease;
+}
+
+.camera-start-actions button:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 8px 22px rgba(8, 3, 5, 0.36), 0 0 0 1px rgba(255, 255, 255, 0.2);
+  filter: brightness(1.1);
+}
+
+.camera-start-actions button:focus-visible {
+  outline: 2px solid var(--lilac-ash);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 5px rgba(176, 145, 159, 0.2);
+}
+
+.camera-start-actions button:active {
+  transform: translateY(0) scale(0.98);
+  filter: brightness(0.96);
+}
+
 .camera-video,
 .captured-image {
   position: absolute;
@@ -1554,6 +1611,12 @@
   margin-top: 16px;
   color: var(--muted);
   font-size: 0.86rem;
+}
+
+.camera-controls > span {
+  flex: 1 0 100%;
+  text-align: center;
+  opacity: 0.7;
 }
 
 .capture-button,
@@ -1768,6 +1831,16 @@
 .camera-side-column-compact {
   align-content: start;
   gap: 10px;
+  text-align: center;
+}
+
+.camera-side-column-compact .camera-card-heading,
+.camera-side-column-compact .rating-row {
+  justify-content: center;
+}
+
+.camera-side-column-compact .weather-details {
+  justify-content: center;
 }
 
 .camera-side-column-compact .weather-card,
@@ -1777,10 +1850,10 @@
 }
 
 .camera-side-column-compact .weather-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  font-size: 1rem;
+  width: 36px;
+  height: 36px;
+  /* border-radius: 8px; */
+  font-size: 2rem;
 }
 
 .camera-side-column-compact .weather-temperature {
@@ -1790,7 +1863,7 @@
 
 .camera-side-column-compact .weather-description {
   margin: 4px 0 6px;
-  font-size: 0.92rem;
+  font-size: 2rem;
 }
 
 .camera-side-column-compact .weather-details {
