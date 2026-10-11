@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import girlLogo from "../assets/Girl(2).svg";
+import girlLogo from "../assets/Girl(7).svg";
 import "./Auth.css";
 
 const USER_STORAGE_KEY = "fitcheck-user";
