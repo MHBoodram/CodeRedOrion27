@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import girlLogo from "../../Girl.svg";
+import { useNavigate } from "react-router-dom";
+import girlLogo from "../assets/Girl(6).svg";
 import WeatherBadge from "../components/WeatherBadge.jsx";
+import { dummyFriends, dummyNotifications, dummyPastFits } from "../data/dummyDatabase.js";
+import { requestStyleMoodboard } from "../styleGuideApi.js";
 import "./HomePage.css";
 
-const navItems = ["Try-on", "Discover", "Saved", "History"];
+const navItems = ["Today's Fit", "Past Fits", "Friends", "Style Guide"];
 
 const recommendations = [
   {
@@ -38,15 +41,8 @@ const savedLooks = [
   { name: "City minimal", time: "3d ago" },
 ];
 
-const previousFits = [
-  { name: "Velvet dusk", date: "Apr 24, 2026", vibe: "Late dinner glow" },
-  { name: "Café neutral", date: "Apr 18, 2026", vibe: "Effortless layers" },
-  { name: "Studio soft", date: "Apr 09, 2026", vibe: "Clean tailoring" },
-  { name: "Rainy day edit", date: "Mar 31, 2026", vibe: "Warm and grounded" },
-];
-
 const similarStyles = [
-  { name: "Warm tailoring", detail: "Soft structure · earthy tones", image: recommendations[0].image },
+  { name: "Warm tailorinong", detail: "Soft structure · earthy tones", image: recommendations[0].image },
   { name: "Modern romantic", detail: "Fluid layers · muted accents", image: recommendations[2].image },
 ];
 
@@ -62,107 +58,257 @@ function getWeatherDescription(code) {
   return "Check local conditions";
 }
 
+function getCurrentUsername() {
+  try {
+    const savedUser = JSON.parse(window.localStorage.getItem("fitcheck-user") || "null");
+    const session = JSON.parse(window.localStorage.getItem("fitcheck-session") || "null");
+    return savedUser?.username || session?.username || savedUser?.name || session?.name || "Guest";
+  } catch {
+    return "Guest";
+  }
+}
+
+function getCurrentEmail() {
+  try {
+    const savedUser = JSON.parse(window.localStorage.getItem("fitcheck-user") || "null");
+    const session = JSON.parse(window.localStorage.getItem("fitcheck-session") || "null");
+    return savedUser?.email || session?.email || "No email saved";
+  } catch {
+    return "No email saved";
+  }
+}
+
 export default function HomePage() {
+  const username = getCurrentUsername();
+  const friendFeedbackKey = `fitcheck-friend-feedback:${username}`;
+  const email = getCurrentEmail();
+  const usernameInitials = username.slice(0, 2).toUpperCase();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("Camera");
-  const [cameraAttempt, setCameraAttempt] = useState(0);
-  const [cameraStatus, setCameraStatus] = useState("loading");
+  const [stylePrompt, setStylePrompt] = useState("");
+  const [styleMoodboard, setStyleMoodboard] = useState(null);
+  const [styleGuideStatus, setStyleGuideStatus] = useState("idle");
+  const [styleGuideError, setStyleGuideError] = useState("");
+  const [friendFeedback, setFriendFeedback] = useState(() => {
+    try {
+      return JSON.parse(window.localStorage.getItem(friendFeedbackKey) || "{}");
+    } catch {
+      return {};
+    }
+  });
+  const [friendCommentDrafts, setFriendCommentDrafts] = useState({});
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isNotificationMenuOpen, setIsNotificationMenuOpen] = useState(false);
+  const [notifications, setNotifications] = useState(dummyNotifications);
+  const [cameraStarted, setCameraStarted] = useState(false);
+  const [cameraStatus, setCameraStatus] = useState("idle");
   const [cameraError, setCameraError] = useState("");
   const [cameraSwitchMessage, setCameraSwitchMessage] = useState("");
   const [capturedFit, setCapturedFit] = useState("");
   const videoRef = useRef(null);
+  const photoInputRef = useRef(null);
   const cameraStreamRef = useRef(null);
   const cameraDevicesRef = useRef([]);
   const cameraSessionRef = useRef(0);
+  const accountMenuRef = useRef(null);
+  const notificationMenuRef = useRef(null);
+  const accountMenuCloseTimerRef = useRef(null);
 
-  const isHistoryView = activeTab === "History";
+  const isHistoryView = activeTab === "Past Fits";
+  const isStyleGuideView = activeTab === "Style Guide";
   const isCameraView = activeTab === "Camera";
+  const isFriendsView = activeTab === "Friends";
+  const unreadNotificationCount = notifications.filter((notification) => !notification.read).length;
 
   useEffect(() => {
-    if (!isCameraView) return undefined;
-
-    let cancelled = false;
-    let stream;
-    const video = videoRef.current;
-    cameraSessionRef.current += 1;
-
-    async function getVideoInputs() {
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      cameraDevicesRef.current = devices.filter((device) => device.kind === "videoinput");
-      return cameraDevicesRef.current;
+    try {
+      window.localStorage.setItem(friendFeedbackKey, JSON.stringify(friendFeedback));
+    } catch {
+      // Keep feedback in the current view if browser storage is unavailable.
     }
+  }, [friendFeedback, friendFeedbackKey]);
 
-    async function startCamera() {
-      try {
-        if (!navigator.mediaDevices?.getUserMedia) {
-          throw new Error("Camera access is not supported by this browser or connection.");
-        }
+  function rateFriendFit(friendId, rating) {
+    setFriendFeedback((current) => ({
+      ...current,
+      [friendId]: { ...current[friendId], rating },
+    }));
+  }
 
-        try {
-          stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-        } catch (initialError) {
-          const devices = await getVideoInputs();
-          if (devices.length === 0) throw initialError;
+  function addFriendComment(event, friendId) {
+    event.preventDefault();
+    const text = friendCommentDrafts[friendId]?.trim();
+    if (!text) return;
 
-          let lastError = initialError;
-          for (const device of devices) {
-            try {
-              stream = await navigator.mediaDevices.getUserMedia({
-                video: { deviceId: { exact: device.deviceId } },
-                audio: false,
-              });
-              break;
-            } catch (error) {
-              lastError = error;
-            }
-          }
-          if (!stream) throw lastError;
-        }
+    setFriendFeedback((current) => {
+      const feedback = current[friendId] || {};
+      return {
+        ...current,
+        [friendId]: {
+          ...feedback,
+          comments: [...(feedback.comments || []), { id: `${Date.now()}`, username, text }],
+        },
+      };
+    });
+    setFriendCommentDrafts((current) => ({ ...current, [friendId]: "" }));
+  }
 
-        if (cancelled) {
-          stream.getTracks().forEach((track) => track.stop());
-          return;
-        }
+  function openAccountMenu() {
+    window.clearTimeout(accountMenuCloseTimerRef.current);
+    setIsAccountMenuOpen(true);
+  }
 
-        cameraStreamRef.current = stream;
-        if (video) video.srcObject = stream;
-        if (!cancelled) setCameraStatus("ready");
-        try {
-          await getVideoInputs();
-        } catch {
-          cameraDevicesRef.current = [];
-        }
-      } catch (error) {
-        if (!cancelled) {
-          const message = error instanceof Error
-            ? error.message
-            : "Unable to access the camera. Check your browser permissions and try again.";
-          setCameraError(message);
-          setCameraStatus("error");
-        }
+  function delayAccountMenuClose() {
+    window.clearTimeout(accountMenuCloseTimerRef.current);
+    accountMenuCloseTimerRef.current = window.setTimeout(() => {
+      setIsAccountMenuOpen(false);
+    }, 2000);
+  }
+
+  useEffect(() => {
+    if (!isAccountMenuOpen && !isSettingsOpen && !isNotificationMenuOpen) return undefined;
+
+    function closeAccountOverlays(event) {
+      if (event.key === "Escape") {
+        window.clearTimeout(accountMenuCloseTimerRef.current);
+        setIsAccountMenuOpen(false);
+        setIsSettingsOpen(false);
+        setIsNotificationMenuOpen(false);
+        return;
+      }
+
+      if (event.type === "pointerdown" && !accountMenuRef.current?.contains(event.target)) {
+        window.clearTimeout(accountMenuCloseTimerRef.current);
+        setIsAccountMenuOpen(false);
+      }
+      if (event.type === "pointerdown" && !notificationMenuRef.current?.contains(event.target)) {
+        setIsNotificationMenuOpen(false);
       }
     }
 
-    startCamera();
+    document.addEventListener("pointerdown", closeAccountOverlays);
+    window.addEventListener("keydown", closeAccountOverlays);
+    return () => {
+      document.removeEventListener("pointerdown", closeAccountOverlays);
+      window.removeEventListener("keydown", closeAccountOverlays);
+      window.clearTimeout(accountMenuCloseTimerRef.current);
+    };
+  }, [isAccountMenuOpen, isSettingsOpen, isNotificationMenuOpen]);
+
+  function markNotificationRead(notificationId) {
+    setNotifications((current) => current.map((notification) => (
+      notification.id === notificationId ? { ...notification, read: true } : notification
+    )));
+  }
+
+  useEffect(() => {
+    if (!isCameraView || !cameraStarted) return undefined;
 
     return () => {
-      cancelled = true;
       cameraSessionRef.current += 1;
       const activeStream = cameraStreamRef.current;
       activeStream?.getTracks().forEach((track) => track.stop());
-      if (stream && stream !== activeStream) {
-        stream.getTracks().forEach((track) => track.stop());
-      }
       cameraStreamRef.current = null;
-      if (video) video.srcObject = null;
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+        videoRef.current = null;
+      }
     };
-  }, [isCameraView, cameraAttempt]);
+  }, [isCameraView, cameraStarted]);
 
   function openCameraPage() {
     setCameraError("");
     setCameraSwitchMessage("");
-    setCameraStatus("loading");
+    setCameraStarted(false);
+    setCameraStatus("idle");
     setCapturedFit("");
     setActiveTab("Camera");
+  }
+
+  async function startCamera() {
+    setCameraError("");
+    setCameraStatus("loading");
+    setCameraStarted(true);
+
+    const session = ++cameraSessionRef.current;
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error("Camera access requires a secure connection. Upload a photo or open this page on localhost or HTTPS.");
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      if (session !== cameraSessionRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+
+      cameraStreamRef.current = stream;
+      if (videoRef.current) videoRef.current.srcObject = stream;
+      setCameraStatus("ready");
+      try {
+        cameraDevicesRef.current = (await navigator.mediaDevices.enumerateDevices())
+          .filter((device) => device.kind === "videoinput");
+      } catch {
+        cameraDevicesRef.current = [];
+      }
+    } catch (error) {
+      if (session !== cameraSessionRef.current) return;
+
+      const permissionDenied = ["NotAllowedError", "SecurityError"].includes(error?.name);
+      const noCamera = error?.name === "NotFoundError";
+      const cameraBusy = error?.name === "NotReadableError";
+      const message = permissionDenied
+        ? `Camera access is denied for ${window.location.origin}. Allow Camera in this site's address-bar permissions, reload the page, and try again. If it is already allowed there, check your operating system's camera privacy settings.`
+        : noCamera
+          ? "No camera was found. Connect a camera or upload a photo instead."
+          : cameraBusy
+            ? "The camera is being used by another app. Close it there or upload a photo instead."
+            : error instanceof Error
+              ? error.message
+              : "Unable to access the camera. Upload a photo or try again.";
+      setCameraError(message);
+      setCameraStatus("error");
+    }
+  }
+
+  function retakePhoto() {
+    setCapturedFit("");
+    setCameraError("");
+    setCameraStarted(false);
+    setCameraStatus("idle");
+  }
+
+  function backToPhotoChoices() {
+    setCameraError("");
+    setCameraSwitchMessage("");
+    setCameraStarted(false);
+    setCameraStatus("idle");
+  }
+
+  function handleLogout() {
+    try {
+      window.localStorage.removeItem("fitcheck-session");
+    } finally {
+      navigate("/login");
+    }
+  }
+
+  async function handleStyleGuideSubmit(event) {
+    event.preventDefault();
+    const prompt = stylePrompt.trim();
+    if (!prompt) return;
+
+    setStyleGuideStatus("loading");
+    setStyleGuideError("");
+    try {
+      const moodboard = await requestStyleMoodboard(prompt);
+      setStyleMoodboard(moodboard);
+      setStyleGuideStatus("success");
+    } catch (error) {
+      setStyleGuideError(error instanceof Error ? error.message : "Could not build that mood board.");
+      setStyleGuideStatus("error");
+    }
   }
 
   async function switchCamera() {
@@ -248,59 +394,303 @@ export default function HomePage() {
     setCapturedFit(canvas.toDataURL("image/jpeg", 0.88));
   }
 
+  function handlePhotoUpload(event) {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setCameraError("Choose an image file for your outfit photo.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.addEventListener("load", () => {
+      if (typeof reader.result === "string") {
+        setCapturedFit(reader.result);
+        setCameraError("");
+        setCameraSwitchMessage("");
+      } else {
+        setCameraError("Could not read that image. Please try another photo.");
+      }
+    }, { once: true });
+    reader.addEventListener("error", () => {
+      setCameraError("Could not read that image. Please try another photo.");
+    }, { once: true });
+    reader.readAsDataURL(file);
+  }
+
   return (
     <div className="fashion-app">
-      <aside className="sidebar">
+      <aside className="sidebar" aria-label="Dashboard navigation">
         <div className="brand">
-          <div className="brand-mark">
-            <img className="brand-logo" src={girlLogo} alt="Fit Check logo" />
-          </div>
-          <div className="brand-copy">
-            <span>Fashion</span>
-            <strong>Check</strong>
-          </div>
+          <img className="brand-logo" src={girlLogo} alt="Fit Check logo" />
         </div>
-
         <nav className="nav-menu" aria-label="Main navigation">
           {navItems.map((item) => (
             <button
               key={item}
               type="button"
-              className={(item === activeTab || (item === "Try-on" && isCameraView)) ? "nav-item active" : "nav-item"}
-              onClick={() => item === "Try-on" ? openCameraPage() : setActiveTab(item)}
+              className={(item === activeTab || (item === "Today's Fit" && isCameraView)) ? "nav-item active" : "nav-item"}
+              onClick={() => item === "Today's Fit" ? openCameraPage() : setActiveTab(item)}
             >
               {item}
             </button>
           ))}
         </nav>
-
-        <div className="promo-card">
-          <p>Season drop</p>
-          <h3>Autumn Luxe</h3>
-          <button type="button">View edit</button>
-        </div>
       </aside>
 
       <main className="main-panel">
         <header className="topbar">
-          <label className="search-box" aria-label="Search fashion recommendations">
-            <span aria-hidden="true">⌕</span>
-            <input type="text" placeholder="Search looks, brands..." />
-          </label>
-
-          <div className="user-pill">
-            <div className="avatar">AR</div>
-            <div>
-              <strong>Ariana</strong>
-              <small>Premium</small>
-            </div>
+          <div className="notification-menu" ref={notificationMenuRef}>
+            <button
+              className="notification-trigger"
+              type="button"
+              aria-label={`Notifications${unreadNotificationCount ? `, ${unreadNotificationCount} unread` : ""}`}
+              aria-haspopup="menu"
+              aria-expanded={isNotificationMenuOpen}
+              title="Notifications"
+              onClick={() => {
+                setIsAccountMenuOpen(false);
+                setIsNotificationMenuOpen((open) => !open);
+              }}
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" />
+              </svg>
+              {unreadNotificationCount > 0 && (
+                <span className="notification-count">{unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}</span>
+              )}
+            </button>
+            {isNotificationMenuOpen && (
+              <div className="notification-dropdown" role="menu" aria-label="Notifications">
+                <header className="notification-dropdown-header">
+                  <h2>Notifications</h2>
+                  <span>{unreadNotificationCount} new</span>
+                </header>
+                {notifications.length ? (
+                  <ul>
+                    {notifications.map((notification) => (
+                      <li key={notification.id}>
+                        <button
+                          className={`notification-item${notification.read ? "" : " unread"}`}
+                          type="button"
+                          role="menuitem"
+                          onClick={() => markNotificationRead(notification.id)}
+                        >
+                          <span className="notification-type">{notification.type}</span>
+                          <span className="notification-copy">
+                            <strong>{notification.actor}</strong>
+                            <span>{notification.message}</span>
+                            <time>{notification.time}</time>
+                          </span>
+                          {!notification.read && <span className="notification-unread-dot" aria-label="Unread" />}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="notification-empty">You’re all caught up.</p>
+                )}
+              </div>
+            )}
           </div>
-          <button type="button" className="secondary-btn dashboard-switch" onClick={() => window.location.href = "/login"}>
-            Back to login
-          </button>
+          <div
+            className="account-menu"
+            ref={accountMenuRef}
+            onMouseEnter={openAccountMenu}
+            onMouseLeave={delayAccountMenuClose}
+            onFocus={openAccountMenu}
+          >
+            <button
+              className="user-pill"
+              type="button"
+              aria-label={`Account menu for ${username}`}
+              aria-haspopup="menu"
+              aria-expanded={isAccountMenuOpen}
+              onClick={() => {
+                window.clearTimeout(accountMenuCloseTimerRef.current);
+                setIsAccountMenuOpen((open) => !open);
+              }}
+            >
+              <span className="avatar" aria-hidden="true">{usernameInitials}</span>
+              <strong>{username}</strong>
+              <span className="account-chevron" aria-hidden="true">⌄</span>
+            </button>
+            {isAccountMenuOpen && (
+              <div className="account-dropdown" role="menu" aria-label="Account options">
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    window.clearTimeout(accountMenuCloseTimerRef.current);
+                    setIsAccountMenuOpen(false);
+                    setIsSettingsOpen(true);
+                  }}
+                >
+                  Settings
+                </button>
+                <button className="account-logout" type="button" role="menuitem" onClick={handleLogout}>
+                  Log out
+                </button>
+              </div>
+            )}
+          </div>
         </header>
 
-        {!isHistoryView && !isCameraView ? (
+        {isStyleGuideView ? (
+          <section className="style-guide-page" aria-labelledby="style-guide-title">
+            <header className="style-guide-heading">
+              <p className="mini-label">Style Guide</p>
+              <h1 id="style-guide-title">What style are you imagining?</h1>
+              <p>Start with an aesthetic, occasion, color, or silhouette.</p>
+            </header>
+
+            <form className="style-guide-form" onSubmit={handleStyleGuideSubmit} aria-busy={styleGuideStatus === "loading"}>
+              <label htmlFor="style-guide-prompt">Describe your style</label>
+              <div className="style-guide-input-row">
+                <input
+                  id="style-guide-prompt"
+                  className="style-guide-input"
+                  value={stylePrompt}
+                  onChange={(event) => setStylePrompt(event.target.value)}
+                  placeholder="e.g. relaxed autumn streetwear in warm neutrals"
+                  maxLength={120}
+                  required
+                />
+                <button className="primary-btn style-guide-submit" type="submit" disabled={styleGuideStatus === "loading" || !stylePrompt.trim()}>
+                  {styleGuideStatus === "loading" ? "Building…" : "Build moodboard"}
+                </button>
+              </div>
+            </form>
+
+            <div className="style-guide-examples" aria-label="Example style prompts">
+              <span className="mini-label">Try a direction</span>
+              {["Soft autumn tailoring", "Oversized streetwear", "Cozy winter layers", "Soft romantic minimalism"].map((example) => (
+                <button className="style-example-button" key={example} type="button" onClick={() => setStylePrompt(example)}>
+                  {example}
+                </button>
+              ))}
+            </div>
+
+            {styleGuideStatus === "loading" && <p className="style-guide-status" role="status">Structuring your style brief…</p>}
+            {styleGuideError && <p className="style-guide-error" role="alert">{styleGuideError}</p>}
+
+            {styleMoodboard && styleGuideStatus === "success" && (
+              <section className="style-moodboard" aria-live="polite" aria-labelledby="moodboard-title">
+                <header className="style-moodboard-header">
+                  <div>
+                    <p className="mini-label">Your style direction</p>
+                    <h2 id="moodboard-title">{styleMoodboard.title}</h2>
+                    <p>{styleMoodboard.summary}</p>
+                  </div>
+                  <div className="style-keywords">
+                    {styleMoodboard.keywords.map((keyword) => <span key={keyword}>{keyword}</span>)}
+                  </div>
+                </header>
+
+                <div className="style-palette" aria-label="Suggested color palette">
+                  {styleMoodboard.palette.map((color) => (
+                    <div className="style-palette-swatch" key={color.name}>
+                      <span style={{ backgroundColor: color.value }} aria-hidden="true" />
+                      <small>{color.name}</small>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="style-moodboard-grid">
+                  {styleMoodboard.looks.map((look, index) => (
+                    <article className="style-look" key={look.title}>
+                      <img src={look.image} alt={`${look.title} outfit inspiration`} />
+                      <div className="style-look-copy">
+                        <p className="mini-label">Look {String(index + 1).padStart(2, "0")}</p>
+                        <h3>{look.title}</h3>
+                        <p>{look.description}</p>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            )}
+          </section>
+        ) : isFriendsView ? (
+          <section className="friends-page" aria-labelledby="friends-heading">
+            <header className="friends-page-header">
+              <p className="mini-label">Community</p>
+              <h1 id="friends-heading">Friends</h1>
+              <p>See what your friends are wearing and share your take.</p>
+            </header>
+            <div className="friends-grid">
+              {dummyFriends.map((friend) => {
+                const feedback = friendFeedback[friend.id] || {};
+                const comments = [...friend.comments, ...(feedback.comments || [])];
+                return (
+                  <article className="friend-card" key={friend.id}>
+                    <header className="friend-card-header">
+                      <div className="friend-avatar" aria-hidden="true">{friend.username.slice(0, 2).toUpperCase()}</div>
+                      <div>
+                        <h2>{friend.username}</h2>
+                        <time>{friend.postedAt}</time>
+                      </div>
+                    </header>
+                    <img className="friend-photo" src={friend.photo} alt={`${friend.username} wearing ${friend.fitName}`} />
+                    <div className="friend-card-details">
+                      <h3>{friend.fitName}</h3>
+                      <p className="friend-fit-score"><span>Fit score</span><strong>{friend.fitScore.toFixed(1)} / 10</strong></p>
+                      <p className="friend-style-worn">{friend.styleWorn}</p>
+
+                      <section className="friend-rating-section" aria-label={`Rate ${friend.username}'s outfit`}>
+                        <div className="friend-rating-heading">
+                          <span>Your rating</span>
+                          <output>{feedback.rating ? `${feedback.rating} / 5` : "Not rated"}</output>
+                        </div>
+                        <div className="friend-stars" role="group" aria-label={`Rate ${friend.username} out of five stars`}>
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <button
+                              className={`friend-star${feedback.rating >= star ? " selected" : ""}`}
+                              key={star}
+                              type="button"
+                              aria-label={`${star} ${star === 1 ? "star" : "stars"}`}
+                              aria-pressed={feedback.rating === star}
+                              onClick={() => rateFriendFit(friend.id, star)}
+                            >
+                              &#9733;
+                            </button>
+                          ))}
+                        </div>
+                      </section>
+
+                      <section className="friend-comments" aria-label={`Comments on ${friend.username}'s fit`}>
+                        <h4>Comments</h4>
+                        <ul>
+                          {comments.map((comment) => (
+                            <li key={comment.id}><strong>{comment.username}</strong><p>{comment.text}</p></li>
+                          ))}
+                        </ul>
+                        <form className="friend-comment-form" onSubmit={(event) => addFriendComment(event, friend.id)}>
+                          <label htmlFor={`friend-comment-${friend.id}`}>Add a comment</label>
+                          <input
+                            id={`friend-comment-${friend.id}`}
+                            type="text"
+                            value={friendCommentDrafts[friend.id] || ""}
+                            onChange={(event) => setFriendCommentDrafts((current) => ({ ...current, [friend.id]: event.target.value }))}
+                            placeholder="What do you think?"
+                            autoComplete="off"
+                            maxLength="240"
+                          />
+                          <button className="secondary-btn" type="submit" disabled={!friendCommentDrafts[friend.id]?.trim()}>
+                            Comment
+                          </button>
+                        </form>
+                      </section>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+        ) : !isHistoryView && !isCameraView ? (
           <>
             <section className="hero-panel">
               <div className="hero-copy">
@@ -400,35 +790,27 @@ export default function HomePage() {
           <section className="history-panel">
             <div className="section-header history-header">
               <div>
-                <p className="mini-label">Your timeline</p>
-                <h2>Previous fits</h2>
+                <p className="mini-label">Your History</p>
+                <h2>Your past fits</h2>
               </div>
-              <button type="button" className="link-btn">
-                Export moodboard
-              </button>
+           
             </div>
 
             <div className="history-list">
-              {previousFits.map((fit, index) => (
-                <article key={fit.name} className="history-item">
-                  <div
-                    className="history-image"
-                    style={{
-                      backgroundImage: `url(https://images.unsplash.com/${[
-                        "photo-1529139574466-a303027c1d8b",
-                        "photo-1524504388940-b1c1722653e1",
-                        "photo-1483985988355-763728e1935b",
-                        "photo-1496747611176-843222e1e57c",
-                      ][index]}?auto=format&fit=crop&w=900&q=80)`,
-                    }}
-                  />
+              {dummyPastFits.map((fit) => (
+                <article key={fit.id} className="history-item">
+                  <img className="history-image" src={fit.image} alt={`${fit.name} outfit`} />
                   <div className="history-copy">
                     <div className="history-topline">
                       <span>{fit.date}</span>
-                      <span className="tag">Fit #{index + 1}</span>
+                      <span className="tag">{fit.id}</span>
+                    </div>
+                    <div className="history-rating">
+                      <span>Rating</span>
+                      <strong>{fit.rating.toFixed(1)} / 10</strong>
                     </div>
                     <h3>{fit.name}</h3>
-                    <p>{fit.vibe}</p>
+                    <p>{fit.styleWorn}</p>
                   </div>
                 </article>
               ))}
@@ -439,63 +821,98 @@ export default function HomePage() {
             <header className="camera-page-header">
               <div>
                 <p className="mini-label">Virtual fitting room</p>
-                <h1>Try on your fit</h1>
-                <p>Capture today’s look and get a little styling inspiration.</p>
+                <h1>Check your fit!</h1>
+                <p>Snap a picture, see your rating, and get a little styling advice.</p>
               </div>
               <button type="button" className="link-btn" onClick={() => setActiveTab("Discover")}>
-                Back to discover
+                Discover more styles
               </button>
             </header>
 
             <div className="camera-layout">
               <div className="camera-main-column">
                 <section className="camera-stage" aria-label="Camera preview">
+                  <input
+                    ref={photoInputRef}
+                    className="camera-file-input"
+                    type="file"
+                    accept="image/*"
+                    aria-label="Choose an outfit photo to upload"
+                    onChange={handlePhotoUpload}
+                  />
                   <div className="camera-preview">
-                    <video
-                      ref={videoRef}
-                      autoPlay
-                      playsInline
-                      muted
-                      aria-label="Live camera preview"
-                      className={capturedFit ? "camera-video is-hidden" : "camera-video"}
-                    />
+                    {cameraStarted && !capturedFit && (
+                      <button
+                        className="camera-preview-back"
+                        type="button"
+                        aria-label="Back to photo choices"
+                        title="Back to photo choices"
+                        onClick={backToPhotoChoices}
+                      >
+                        <span aria-hidden="true">&#8592;</span>
+                      </button>
+                    )}
+                    {!capturedFit && cameraStarted && (
+                      <video
+                        ref={videoRef}
+                        autoPlay
+                        playsInline
+                        muted
+                        aria-label="Live camera preview"
+                        className="camera-video"
+                      />
+                    )}
                     {capturedFit && <img className="captured-image" src={capturedFit} alt="Your captured outfit" />}
-                    {!capturedFit && cameraStatus === "loading" && (
+                    {!capturedFit && !cameraStarted && (
+                      <div className="camera-start-choices">
+                        <p>How would you like to add your outfit photo?</p>
+                        <div className="camera-start-actions">
+                          <button type="button" className="secondary-btn" onClick={() => photoInputRef.current?.click()}>
+                            Upload photo
+                          </button>
+                          <button type="button" className="primary-btn" onClick={startCamera}>
+                            Take fit photo
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    {!capturedFit && cameraStarted && cameraStatus === "loading" && (
                       <p className="camera-message" role="status">Connecting to your camera…</p>
                     )}
-                    {!capturedFit && cameraStatus === "error" && (
+                    {!capturedFit && cameraStarted && cameraStatus === "error" && (
                       <div className="camera-message camera-error" role="alert">
                         <p>{cameraError}</p>
                         <button
                           type="button"
                           className="primary-btn"
-                          onClick={() => {
-                            setCameraError("");
-                            setCameraStatus("loading");
-                            setCameraAttempt((attempt) => attempt + 1);
-                          }}
+                          onClick={startCamera}
                         >
                           Try again
                         </button>
                       </div>
                     )}
-                    {!capturedFit && cameraStatus === "ready" && (
+                    {!capturedFit && cameraStarted && cameraStatus === "ready" && (
                       <span className="camera-live"><span /> Camera is on</span>
                     )}
                   </div>
 
                   <div className="camera-controls">
-                    {!capturedFit && cameraStatus === "ready" && (
+                    {!capturedFit && cameraStarted && cameraStatus === "ready" && (
                       <button type="button" className="secondary-btn switch-camera-button" onClick={switchCamera}>
                         <span aria-hidden="true">⇄</span>
                         Switch camera
                       </button>
                     )}
                     {capturedFit ? (
-                      <button type="button" className="primary-btn capture-button" onClick={() => setCapturedFit("")}>
-                        Retake photo
-                      </button>
-                    ) : (
+                      <>
+                        <button type="button" className="secondary-btn upload-photo-button" onClick={() => photoInputRef.current?.click()}>
+                          Upload another
+                        </button>
+                        <button type="button" className="primary-btn capture-button" onClick={retakePhoto}>
+                          Retake photo
+                        </button>
+                      </>
+                    ) : cameraStarted ? (
                       <button
                         type="button"
                         className="primary-btn capture-button"
@@ -505,7 +922,7 @@ export default function HomePage() {
                         <span className="shutter-icon" aria-hidden="true" />
                         Take fit photo
                       </button>
-                    )}
+                    ) : null}
                     <span>Your photo stays in this session and is not uploaded.</span>
                   </div>
                   {cameraSwitchMessage && <p className="camera-switch-message" role="status">{cameraSwitchMessage}</p>}
@@ -536,8 +953,7 @@ export default function HomePage() {
                 <section className="weather-card">
                   <div className="camera-card-heading">
                     <div>
-                      <p className="mini-label">Today, where you are</p>
-                      <h2>Weather</h2>
+                      <p className="mini-label">How's the weather today?</p>
                     </div>
                     <span className="weather-icon" aria-hidden="true">☼</span>
                   </div>
@@ -550,13 +966,13 @@ export default function HomePage() {
                     <strong>{capturedFit ? "8.5" : "—"}</strong>
                     <span>/ 10</span>
                   </div>
-                  <p>{capturedFit ? "Sample editorial score; photo-based outfit analysis is not connected yet." : "Take a fit photo to reveal your style score."}</p>
+                  <p>{capturedFit ? "Sample editorial score; photo-based outfit analysis is not connected yet." : "Take a photo of your fit to reveal your style score."}</p>
                 </section>
 
                 <section className="similar-card">
                   <div className="camera-card-heading">
                     <div>
-                      <p className="mini-label">Inspired by your fit</p>
+                      <p className="mini-label">What is your fit giving?</p>
                       <h2>Similar styles</h2>
                     </div>
                   </div>
@@ -579,19 +995,36 @@ export default function HomePage() {
         )}
       </main>
 
-      {!isCameraView && (
-        <button
-          type="button"
-          className="camera-launcher"
-          onClick={openCameraPage}
-          aria-label="Open camera to try on a fit"
-        >
-          <svg aria-hidden="true" viewBox="0 0 24 24">
-            <path d="M4 7.5h3l1.4-2h7.2l1.4 2h3A1.5 1.5 0 0 1 21.5 9v9a1.5 1.5 0 0 1-1.5 1.5H4A1.5 1.5 0 0 1 2.5 18V9A1.5 1.5 0 0 1 4 7.5Z" />
-            <circle cx="12" cy="13.5" r="3.5" />
-          </svg>
-          <span>Try on with camera</span>
-        </button>
+      {isSettingsOpen && (
+        <div className="account-settings-backdrop" onClick={() => setIsSettingsOpen(false)}>
+          <section
+            className="account-settings-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="account-settings-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="account-settings-header">
+              <div>
+                <p className="mini-label">Account</p>
+                <h2 id="account-settings-title">Settings</h2>
+              </div>
+              <button type="button" className="settings-close" aria-label="Close settings" onClick={() => setIsSettingsOpen(false)}>
+                <span aria-hidden="true">&times;</span>
+              </button>
+            </header>
+            <dl className="account-settings-details">
+              <div>
+                <dt>Username</dt>
+                <dd>{username}</dd>
+              </div>
+              <div>
+                <dt>Email</dt>
+                <dd>{email}</dd>
+              </div>
+            </dl>
+          </section>
+        </div>
       )}
     </div>
   );
