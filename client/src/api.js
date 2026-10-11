@@ -1,6 +1,6 @@
 // Merged api client (jesiah + Matthew).
 // api("/auth/login", opts) prefixes /api; api.register/login/me are shortcuts.
-const BASE = String(import.meta.env?.VITE_API_URL || "").replace(/\/+$/, "");
+const API_URL = String(import.meta.env.VITE_API_URL || "https://virpals.online").replace(/\/+$/, "");
 const TOKEN_KEY = "fitcheck-token";
 
 export class ApiError extends Error {
@@ -50,7 +50,7 @@ export async function request(path, { method = "GET", body, auth = true, signal,
 
   let response;
   try {
-    response = await fetch(`${BASE}${path}`, {
+    response = await fetch(`${API_URL}${path}`, {
       method,
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
