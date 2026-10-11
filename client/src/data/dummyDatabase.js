@@ -37,30 +37,51 @@ export const dummyFriends = [
   {
     id: "friend-maya",
     username: "maya.moves",
+<<<<<<< HEAD
     postedAt: "Today, 9:12 AM",
     fitName: "Weekend layers",
     styleWorn: "Relaxed denim with soft, oversized layers",
     fitScore: 9.2,
+=======
+    postedAt: "18 minutes ago",
+    fitName: "Weekend layers",
+    styleWorn: "Relaxed denim with soft, oversized layers",
+    fitScore: 4.6,
+>>>>>>> f013c8724235d03b73a7965efc685ee608758a57
     photo: "/photos/leeyjohn_%20IG%20fits.jpg",
     comments: [{ id: "maya-comment-1", username: "lena.style", text: "The layering works so well." }],
   },
   {
     id: "friend-jordan",
     username: "jordan.in.motion",
+<<<<<<< HEAD
     postedAt: "Yesterday, 4:38 PM",
     fitName: "City uniform",
     styleWorn: "Oversized streetwear with an easy monochrome palette",
     fitScore: 8.7,
+=======
+    postedAt: "2 hours ago",
+    fitName: "City uniform",
+    styleWorn: "Oversized streetwear with an easy monochrome palette",
+    fitScore: 4.4,
+>>>>>>> f013c8724235d03b73a7965efc685ee608758a57
     photo: "/photos/Oversized%20Streetwear%20Outfit%20for%20Men%20_%20Baggy%20Fashion%20Inspiration.jpg",
     comments: [{ id: "jordan-comment-1", username: "maya.moves", text: "Great proportions on this one." }],
   },
   {
     id: "friend-nina",
     username: "nina.afterhours",
+<<<<<<< HEAD
     postedAt: "Monday, 7:06 PM",
     fitName: "Autumn edit",
     styleWorn: "Warm seasonal tones with a clean tailored shape",
     fitScore: 9.5,
+=======
+    postedAt: "9 hours ago",
+    fitName: "Autumn edit",
+    styleWorn: "Warm seasonal tones with a clean tailored shape",
+    fitScore: 4.8,
+>>>>>>> f013c8724235d03b73a7965efc685ee608758a57
     photo: "/photos/Autumn%20Fits.jpg",
     comments: [{ id: "nina-comment-1", username: "jordan.in.motion", text: "Love this color story." }],
   },

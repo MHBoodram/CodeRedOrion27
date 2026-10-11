@@ -1113,6 +1113,7 @@
   padding: 12px;
 }
 
+<<<<<<< HEAD
 .friend-avatar {
   display: grid;
   width: 38px;
@@ -1125,6 +1126,8 @@
   font-weight: 700;
 }
 
+=======
+>>>>>>> f013c8724235d03b73a7965efc685ee608758a57
 .friend-card-header h2 {
   margin: 0;
   color: var(--text);
@@ -1213,6 +1216,10 @@
   font: inherit;
   font-size: 1.55rem;
   line-height: 1;
+<<<<<<< HEAD
+=======
+  transition: color 120ms ease;
+>>>>>>> f013c8724235d03b73a7965efc685ee608758a57
 }
 
 .friend-star.selected {
@@ -1380,6 +1387,49 @@
   padding: 22px 20px;
 }
 
+.camera-page .camera-stage,
+.camera-page .fit-feedback,
+.camera-page .camera-side-column > section {
+  box-shadow: 0 12px 30px rgba(10, 3, 6, 0.3), 0 2px 8px rgba(176, 145, 159, 0.08);
+}
+
+.camera-page .mini-label {
+  font-size: 0.76rem;
+}
+
+.camera-page p:not(.mini-label) {
+  font-size: 1.06rem;
+}
+
+.camera-page .camera-page-header h1 {
+  font-size: clamp(2.5rem, 4.5vw, 3.4rem);
+}
+
+.camera-page .camera-start-choices p {
+  font-size: 1.35rem;
+}
+
+.camera-page .camera-controls {
+  font-size: 0.96rem;
+}
+
+.camera-page .weather-temperature {
+  font-size: clamp(2.2rem, 3.2vw, 3.1rem);
+}
+
+.camera-page .weather-description,
+.camera-page .weather-details {
+  font-size: 1rem;
+}
+
+.camera-page .rating-row strong {
+  font-size: 2.8rem;
+}
+
+.camera-page .camera-card-heading h2 {
+  font-size: 1.4rem;
+}
+
 .camera-page-header {
   display: flex;
   justify-content: space-between;
@@ -1406,6 +1456,23 @@
   background: rgba(255, 255, 255, 0.02);
 }
 
+<<<<<<< HEAD
+=======
+.outfit-color-bar {
+  display: flex;
+  width: 100%;
+  height: 18px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 5px;
+}
+
+.outfit-color-bar span {
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+>>>>>>> f013c8724235d03b73a7965efc685ee608758a57
 .camera-source-prompt {
   margin: 0 0 14px;
   color: var(--text);
@@ -1420,7 +1487,9 @@
   position: relative;
   display: grid;
   place-items: center;
-  min-height: 420px;
+  width: 100%;
+  height: clamp(300px, 55svh, 600px);
+  min-height: 0;
   border: 1px solid var(--line);
   border-radius: 20px;
   overflow: hidden;
@@ -1476,16 +1545,49 @@
   gap: 12px;
 }
 
+<<<<<<< HEAD
+=======
+.camera-start-actions button {
+  min-width: 154px;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 8px;
+  transition: transform 140ms ease, box-shadow 140ms ease, filter 140ms ease, border-color 140ms ease;
+}
+
+.camera-start-actions button:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 8px 22px rgba(8, 3, 5, 0.36), 0 0 0 1px rgba(255, 255, 255, 0.2);
+  filter: brightness(1.1);
+}
+
+.camera-start-actions button:focus-visible {
+  outline: 2px solid var(--lilac-ash);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 5px rgba(176, 145, 159, 0.2);
+}
+
+.camera-start-actions button:active {
+  transform: translateY(0) scale(0.98);
+  filter: brightness(0.96);
+}
+
+>>>>>>> f013c8724235d03b73a7965efc685ee608758a57
 .camera-video,
 .captured-image {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
   display: block;
 }
 
-.camera-video.is-hidden {
-  display: none;
+.camera-video {
+  object-fit: cover;
+}
+
+.captured-image {
+  object-fit: contain;
 }
 
 .camera-message {
@@ -1535,6 +1637,12 @@
   font-size: 0.86rem;
 }
 
+.camera-controls > span {
+  flex: 1 0 100%;
+  text-align: center;
+  opacity: 0.7;
+}
+
 .capture-button,
 .upload-photo-button,
 .switch-camera-button {
@@ -1565,6 +1673,134 @@
 
 .feedback-disclaimer {
   margin-top: 12px;
+}
+
+.target-style-form {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.target-style-form label {
+  color: var(--text);
+  font-size: 0.88rem;
+}
+
+.target-style-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.target-style-fields input {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  font: inherit;
+}
+
+.target-style-fields input::placeholder {
+  color: var(--muted);
+}
+
+.target-style-fields input:focus-visible {
+  outline: 2px solid var(--lilac-ash);
+  outline-offset: 2px;
+}
+
+.target-style-fields button {
+  border-radius: 6px;
+}
+
+.target-style-fields button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.analysis-status,
+.analysis-error {
+  margin: 12px 0 0;
+  font-size: 0.9rem;
+}
+
+.analysis-status {
+  color: var(--muted);
+}
+
+.analysis-error {
+  color: #f4b9b9;
+}
+
+.gemini-analysis {
+  display: grid;
+  gap: 16px;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.gemini-result-heading h3 {
+  margin: 8px 0 0;
+  color: var(--text);
+  font-size: 1.25rem;
+}
+
+.gemini-result-heading > p:last-child,
+.gemini-colors {
+  margin: 8px 0 0;
+  color: var(--muted);
+}
+
+.gemini-colors strong {
+  color: var(--text);
+}
+
+.gemini-result-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.gemini-result-columns h4 {
+  margin: 0 0 8px;
+  color: var(--text);
+}
+
+.gemini-result-columns ul {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.weather-fit-note {
+  margin-top: 14px;
+  padding: 11px 13px;
+  border-left: 3px solid var(--lilac-ash);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.weather-fit-note.not-matched {
+  border-left-color: #e18a81;
+}
+
+.weather-fit-note strong {
+  color: var(--text);
+  font-size: 0.88rem;
+}
+
+.weather-fit-note p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.4;
 }
 
 .improvement-list {
@@ -1614,6 +1850,69 @@
 .camera-side-column {
   display: grid;
   gap: 18px;
+}
+
+.camera-side-column-compact {
+  align-content: start;
+  gap: 10px;
+  text-align: center;
+}
+
+.camera-side-column-compact .camera-card-heading,
+.camera-side-column-compact .rating-row {
+  justify-content: center;
+}
+
+.camera-side-column-compact .weather-details {
+  justify-content: center;
+}
+
+.camera-side-column-compact .weather-card,
+.camera-side-column-compact .rating-card,
+.camera-side-column-compact .similar-card {
+  padding: 12px;
+}
+
+.camera-side-column-compact .weather-icon {
+  width: 36px;
+  height: 36px;
+  /* border-radius: 8px; */
+  font-size: 2rem;
+}
+
+.camera-side-column-compact .weather-temperature {
+  margin-top: 6px;
+  font-size: 1.6rem;
+}
+
+.camera-side-column-compact .weather-description {
+  margin: 4px 0 6px;
+  font-size: 2rem;
+}
+
+.camera-side-column-compact .weather-details {
+  gap: 6px 12px;
+  font-size: 0.8rem;
+}
+
+.camera-side-column-compact .rating-row {
+  margin-top: 4px;
+}
+
+.camera-side-column-compact .rating-row strong {
+  font-size: 1.8rem;
+}
+
+.camera-side-column-compact .similar-style {
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 8px;
+  padding-top: 8px;
+}
+
+.camera-side-column-compact .similar-style img {
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
 }
 
 .weather-card,
@@ -1855,6 +2154,14 @@
     grid-template-columns: 1fr;
   }
 
+<<<<<<< HEAD
+=======
+  .target-style-fields,
+  .gemini-result-columns {
+    grid-template-columns: 1fr;
+  }
+
+>>>>>>> f013c8724235d03b73a7965efc685ee608758a57
   .style-guide-heading h1 {
     font-size: 2rem;
   }
