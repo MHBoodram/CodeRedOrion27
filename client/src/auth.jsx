@@ -50,9 +50,12 @@ export function AuthProvider({ children }) {
   const login = useCallback(async (identifier, password) => finishAuth(await api.login({ identifier, password })), [finishAuth]);
   const register = useCallback(async (payload) => finishAuth(await api.register(payload)), [finishAuth]);
 
+  // Merge fresh profile fields (e.g. after saving settings) into the signed-in user.
+  const updateUser = useCallback((next) => setUser((current) => ({ ...current, ...next })), []);
+
   const value = useMemo(
-    () => ({ user, status, isAuthed: status === "authed", login, register, logout }),
-    [user, status, login, register, logout],
+    () => ({ user, status, isAuthed: status === "authed", login, register, logout, updateUser }),
+    [user, status, login, register, logout, updateUser],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

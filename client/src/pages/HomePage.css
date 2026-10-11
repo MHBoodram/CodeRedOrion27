@@ -2270,3 +2270,66 @@
   text-decoration: underline;
   cursor: pointer;
 }
+
+.friend-card-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.friend-action {
+  padding: 6px 12px;
+  font-size: 0.78rem;
+}
+
+.friend-action.active {
+  border-color: var(--lilac-ash);
+  color: var(--lilac-ash);
+}
+
+.avatar {
+  overflow: hidden;
+}
+
+.avatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.account-settings-form {
+  display: grid;
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.account-settings-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.account-settings-form input,
+.account-settings-form textarea {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  font: inherit;
+  resize: vertical;
+}
+
+.account-settings-form input:focus-visible,
+.account-settings-form textarea:focus-visible {
+  outline: 2px solid var(--lilac-ash);
+  outline-offset: 2px;
+}
+
+.account-settings-actions {
+  display: flex;
+  justify-content: flex-end;
+}

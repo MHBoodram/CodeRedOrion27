@@ -31,45 +31,7 @@ function timeAgo(iso) {
   return `${Math.round(hours / 24)} d ago`;
 }
 
-const navItems = ["Today's Fit", "Past Fits", "Friends", "Style Guide"];
-
-const recommendations = [
-  {
-    name: "Soft Tailored Coat",
-    brand: "Maison de Lune",
-    price: "$238",
-    style: "Warm neutrals",
-    image:
-      "https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=900&q=80",
-  },
-  {
-    name: "Leather Mini",
-    brand: "Vanta Atelier",
-    price: "$189",
-    style: "Night out",
-    image:
-      "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=900&q=80",
-  },
-  {
-    name: "Silk Statement Set",
-    brand: "Veloura",
-    price: "$210",
-    style: "Fluid layers",
-    image:
-      "https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=900&q=80",
-  },
-];
-
-const savedLooks = [
-  { name: "Cinnamon layers", time: "2h ago" },
-  { name: "Weekend ease", time: "1d ago" },
-  { name: "City minimal", time: "3d ago" },
-];
-
-const similarStyles = [
-  { name: "Warm tailorinong", detail: "Soft structure · earthy tones", image: recommendations[0].image },
-  { name: "Modern romantic", detail: "Fluid layers · muted accents", image: recommendations[2].image },
-];
+const navItems = ["Today's Fit", "Past Fits", "Friends", "Saved", "Style Guide"];
 
 function getWeatherDescription(code) {
   if (code === 0) return "Clear skies";
@@ -116,7 +78,7 @@ function resizeImageFile(file) {
 }
 
 export default function HomePage() {
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
   const username = user?.username || "Guest";
   const email = user?.email || "";
   const usernameInitials = username.slice(0, 2).toUpperCase();
@@ -133,6 +95,15 @@ export default function HomePage() {
   const [friendComments, setFriendComments] = useState({});
   const [friendCommentDrafts, setFriendCommentDrafts] = useState({});
   const [friendHoverRatings, setFriendHoverRatings] = useState({});
+  const [pendingActions, setPendingActions] = useState({});
+  const [savedOutfits, setSavedOutfits] = useState([]);
+  const [savedStatus, setSavedStatus] = useState("loading");
+  const [savedError, setSavedError] = useState("");
+  const [recommended, setRecommended] = useState([]);
+  const [recommendedStatus, setRecommendedStatus] = useState("loading");
+  const [settingsDraft, setSettingsDraft] = useState(null);
+  const [settingsStatus, setSettingsStatus] = useState("idle");
+  const [settingsError, setSettingsError] = useState("");
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isNotificationMenuOpen, setIsNotificationMenuOpen] = useState(false);
@@ -167,6 +138,9 @@ export default function HomePage() {
   const isStyleGuideView = activeTab === "Style Guide";
   const isCameraView = activeTab === "Camera";
   const isFriendsView = activeTab === "Friends";
+  const isSavedView = activeTab === "Saved";
+  // The hero/recommendations page. No nav item opens it right now; it shows when no other tab is active.
+  const isHomeView = !isStyleGuideView && !isFriendsView && !isSavedView && !isHistoryView && !isCameraView;
   const isPhotoCountdownActive = countdownRemaining !== null && photoCountdownTimerRef.current !== null;
   const unreadNotificationCount = notifications.filter((notification) => !notification.read).length;
 
@@ -242,6 +216,144 @@ export default function HomePage() {
 
     return () => controller.abort();
   }, [friendsScope, isFriendsView]);
+
+  // Saved outfits: refetch each time the Saved tab opens. (Status starts at "loading", so no synchronous setState here.)
+  useEffect(() => {
+    if (!isSavedView && !isHomeView) return undefined;
+
+    const controller = new AbortController();
+    api("/users/me/saved?limit=50", { signal: controller.signal })
+      .then(({ outfits = [] }) => {
+        setSavedOutfits(outfits);
+        setSavedError("");
+        setSavedStatus("success");
+      })
+      .catch((error) => {
+        if (controller.signal.aborted) return;
+        setSavedError(describeError(error));
+        setSavedStatus("error");
+      });
+
+    return () => controller.abort();
+  }, [isSavedView, isHomeView]);
+
+  // Home recommendations: top-rated outfits, or the newest ones if nothing has been rated yet.
+  useEffect(() => {
+    if (!isHomeView) return undefined;
+
+    const controller = new AbortController();
+    api("/outfits?sort=top&limit=3", { signal: controller.signal })
+      .then(async ({ outfits = [] }) => {
+        if (outfits.length) return outfits;
+        return (await api("/outfits?sort=recent&limit=3", { signal: controller.signal })).outfits || [];
+      })
+      .then((outfits) => {
+        setRecommended(outfits);
+        setRecommendedStatus("success");
+      })
+      .catch((error) => {
+        if (controller.signal.aborted) return;
+        setRecommendedStatus("error");
+        console.error("Could not load recommendations:", describeError(error));
+      });
+
+    return () => controller.abort();
+  }, [isHomeView]);
+
+  function openSettings() {
+    setSettingsDraft({ display_name: user?.display_name || "", bio: user?.bio || "", avatar_url: user?.avatar_url || "" });
+    setSettingsStatus("idle");
+    setSettingsError("");
+    setIsSettingsOpen(true);
+  }
+
+  async function saveSettings(event) {
+    event.preventDefault();
+    const displayName = settingsDraft.display_name.trim();
+    if (!displayName) {
+      setSettingsError("Display name can't be empty.");
+      setSettingsStatus("error");
+      return;
+    }
+    setSettingsStatus("saving");
+    setSettingsError("");
+    try {
+      const { user: updated } = await api("/users/me", {
+        method: "PATCH",
+        body: { display_name: displayName, bio: settingsDraft.bio.trim(), avatar_url: settingsDraft.avatar_url.trim() },
+      });
+      updateUser(updated);
+      setSettingsDraft({ display_name: updated.display_name || "", bio: updated.bio || "", avatar_url: updated.avatar_url || "" });
+      setSettingsStatus("saved");
+    } catch (error) {
+      setSettingsError(describeError(error));
+      setSettingsStatus("error");
+    }
+  }
+
+  // Runs `action` once per key at a time, so a double click can't fire two requests.
+  async function runOnce(key, action) {
+    if (pendingActions[key]) return;
+    setPendingActions((current) => ({ ...current, [key]: true }));
+    try {
+      await action();
+    } finally {
+      setPendingActions((current) => ({ ...current, [key]: false }));
+    }
+  }
+
+  // Follow / unfollow an outfit's author. Updates every card by that author right away, and rolls back if the server refuses.
+  function toggleFollowAuthor(outfit) {
+    const author = outfit.author;
+    if (!author?.username || author.username === username) return;
+    const next = !outfit.author_followed;
+    const setFollowed = (value) => setFriends((current) => current.map((o) => (
+      o.author?.id === author.id ? { ...o, author_followed: value } : o
+    )));
+    return runOnce(`follow-${author.id}`, async () => {
+      setFollowed(next);
+      try {
+        await api(`/users/${encodeURIComponent(author.username)}/follow`, { method: next ? "POST" : "DELETE" });
+        setFriendsError("");
+      } catch (error) {
+        setFollowed(!next);
+        setFriendsError(describeError(error));
+      }
+    });
+  }
+
+  // Save / unsave an outfit from the Friends feed.
+  function toggleSaveOutfit(outfit) {
+    const next = !outfit.saved;
+    const setSaved = (value) => setFriends((current) => current.map((o) => (
+      o.id === outfit.id ? { ...o, saved: value } : o
+    )));
+    return runOnce(`save-${outfit.id}`, async () => {
+      setSaved(next);
+      try {
+        await api(`/outfits/${outfit.id}/save`, { method: next ? "POST" : "DELETE" });
+        setFriendsError("");
+      } catch (error) {
+        setSaved(!next);
+        setFriendsError(describeError(error));
+      }
+    });
+  }
+
+  // Remove an outfit from the Saved tab.
+  function removeSavedOutfit(outfit) {
+    return runOnce(`save-${outfit.id}`, async () => {
+      const before = savedOutfits;
+      setSavedOutfits((current) => current.filter((o) => o.id !== outfit.id));
+      try {
+        await api(`/outfits/${outfit.id}/save`, { method: "DELETE" });
+        setSavedError("");
+      } catch (error) {
+        setSavedOutfits(before);
+        setSavedError(describeError(error));
+      }
+    });
+  }
 
   async function rateFriendFit(friendId, rating) {
     try {
@@ -755,8 +867,10 @@ export default function HomePage() {
                 setIsAccountMenuOpen((open) => !open);
               }}
             >
-              <span className="avatar" aria-hidden="true">{usernameInitials}</span>
-              <strong>{username}</strong>
+              <span className="avatar" aria-hidden="true">
+                {user?.avatar_url ? <img src={user.avatar_url} alt="" /> : usernameInitials}
+              </span>
+              <strong>{user?.display_name || username}</strong>
               <span className="account-chevron" aria-hidden="true">⌄</span>
             </button>
             {isAccountMenuOpen && (
@@ -767,7 +881,7 @@ export default function HomePage() {
                   onClick={() => {
                     window.clearTimeout(accountMenuCloseTimerRef.current);
                     setIsAccountMenuOpen(false);
-                    setIsSettingsOpen(true);
+                    openSettings();
                   }}
                 >
                   Settings
@@ -855,6 +969,57 @@ export default function HomePage() {
               </section>
             )}
           </section>
+        ) : isSavedView ? (
+          <section className="friends-page" aria-labelledby="saved-heading">
+            <header className="friends-page-header">
+              <p className="mini-label">Your collection</p>
+              <h1 id="saved-heading">Saved</h1>
+              <p>Outfits you bookmarked from the Friends feed.</p>
+            </header>
+            {savedStatus === "loading" && <p className="style-guide-status" role="status">Loading saved outfits…</p>}
+            {savedError && <p className="style-guide-error" role="alert">{savedError}</p>}
+            {savedStatus === "success" && savedOutfits.length === 0 && (
+              <p className="style-guide-status">Nothing saved yet. Tap Save on an outfit in Friends.</p>
+            )}
+            <div className="friends-grid">
+              {savedOutfits.map((outfit) => (
+                <article className="friend-card" key={outfit.id}>
+                  <header className="friend-card-header">
+                    <div className="friend-avatar" aria-hidden="true">{(outfit.author?.username || "??").slice(0, 2).toUpperCase()}</div>
+                    <div>
+                      <h2>{outfit.author?.username || "unknown"}</h2>
+                      <time dateTime={outfit.created_at}>
+                        {new Date(outfit.created_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}
+                      </time>
+                    </div>
+                    <div className="friend-card-actions">
+                      <button
+                        type="button"
+                        className="secondary-btn friend-action"
+                        disabled={Boolean(pendingActions[`save-${outfit.id}`])}
+                        onClick={() => removeSavedOutfit(outfit)}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </header>
+                  {outfit.cover_image_url && (
+                    <img className="friend-photo" src={outfit.cover_image_url} alt={`${outfit.author?.username || "Someone"} wearing ${outfit.title}`} />
+                  )}
+                  <div className="friend-card-details">
+                    <h3>{outfit.title}</h3>
+                    <p className="friend-fit-score">
+                      <span>Community rating (1–5)</span>
+                      <strong>
+                        {outfit.rating_count ? `${Number(outfit.rating_avg).toFixed(1)} / 5 (${outfit.rating_count})` : "No ratings yet"}
+                      </strong>
+                    </p>
+                    {outfit.description && <p className="friend-style-worn">{outfit.description}</p>}
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
         ) : isFriendsView ? (
           <section className="friends-page" aria-labelledby="friends-heading">
             <header className="friends-page-header">
@@ -894,6 +1059,28 @@ export default function HomePage() {
                         <time dateTime={outfit.created_at}>
                           {new Date(outfit.created_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}
                         </time>
+                      </div>
+                      <div className="friend-card-actions">
+                        {!isOwnOutfit && (
+                          <button
+                            type="button"
+                            className={outfit.author_followed ? "secondary-btn friend-action active" : "secondary-btn friend-action"}
+                            aria-pressed={Boolean(outfit.author_followed)}
+                            disabled={Boolean(pendingActions[`follow-${author.id}`])}
+                            onClick={() => toggleFollowAuthor(outfit)}
+                          >
+                            {outfit.author_followed ? "Following" : "Follow"}
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className={outfit.saved ? "secondary-btn friend-action active" : "secondary-btn friend-action"}
+                          aria-pressed={Boolean(outfit.saved)}
+                          disabled={Boolean(pendingActions[`save-${outfit.id}`])}
+                          onClick={() => toggleSaveOutfit(outfit)}
+                        >
+                          {outfit.saved ? "Saved" : "Save"}
+                        </button>
                       </div>
                     </header>
                     {outfit.cover_image_url && (
@@ -992,11 +1179,11 @@ export default function HomePage() {
                 </p>
 
                 <div className="hero-actions">
-                  <button type="button" className="primary-btn">
+                  <button type="button" className="primary-btn" onClick={openCameraPage}>
                     Start styling
                   </button>
-                  <button type="button" className="secondary-btn">
-                    My closet
+                  <button type="button" className="secondary-btn" onClick={() => setActiveTab("Saved")}>
+                    Saved looks
                   </button>
                 </div>
               </div>
@@ -1019,26 +1206,31 @@ export default function HomePage() {
                     <p className="mini-label">Recommended now</p>
                     <h2>Trending looks</h2>
                   </div>
-                  <button type="button" className="link-btn">
+                  <button type="button" className="link-btn" onClick={openFriendsView}>
                     See all
                   </button>
                 </div>
 
+                {recommendedStatus === "loading" && <p className="style-guide-status" role="status">Loading looks…</p>}
+                {recommendedStatus === "error" && <p className="style-guide-error" role="alert">Could not load looks right now.</p>}
+                {recommendedStatus === "success" && recommended.length === 0 && (
+                  <p className="style-guide-status">No outfits posted yet.</p>
+                )}
                 <div className="recommend-grid">
-                  {recommendations.map((item) => (
-                    <article key={item.name} className="look-card">
+                  {recommended.map((outfit) => (
+                    <article key={outfit.id} className="look-card">
                       <div
                         className="look-image"
-                        style={{ backgroundImage: `url(${item.image})` }}
-                        aria-label={item.name}
+                        style={outfit.cover_image_url ? { backgroundImage: `url(${outfit.cover_image_url})` } : undefined}
+                        aria-label={outfit.title}
                       />
                       <div className="look-meta">
                         <div className="look-row">
-                          <span>{item.brand}</span>
-                          <strong>{item.price}</strong>
+                          <span>@{outfit.author?.username}</span>
+                          <strong>{outfit.rating_count ? `${Number(outfit.rating_avg).toFixed(1)} / 5` : "New"}</strong>
                         </div>
-                        <h3>{item.name}</h3>
-                        <p>{item.style}</p>
+                        <h3>{outfit.title}</h3>
+                        <p>{outfit.tags?.[0] || outfit.occasion || "Fresh look"}</p>
                       </div>
                     </article>
                   ))}
@@ -1058,20 +1250,24 @@ export default function HomePage() {
                 <div className="saved-card">
                   <div className="section-header compact">
                     <h3>Saved looks</h3>
-                    <span>04</span>
+                    <span>{String(savedOutfits.length).padStart(2, "0")}</span>
                   </div>
 
-                  <ul>
-                    {savedLooks.map((look) => (
-                      <li key={look.name}>
-                        <span className="dot" aria-hidden="true" />
-                        <div>
-                          <strong>{look.name}</strong>
-                          <small>{look.time}</small>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
+                  {savedOutfits.length === 0 ? (
+                    <p className="style-guide-status">Nothing saved yet.</p>
+                  ) : (
+                    <ul>
+                      {savedOutfits.slice(0, 4).map((look) => (
+                        <li key={look.id}>
+                          <span className="dot" aria-hidden="true" />
+                          <div>
+                            <strong>{look.title}</strong>
+                            <small>@{look.author?.username}</small>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               </aside>
             </section>
@@ -1420,6 +1616,45 @@ export default function HomePage() {
                 <dd>{email}</dd>
               </div>
             </dl>
+            {settingsDraft && (
+              <form className="account-settings-form" onSubmit={saveSettings}>
+                <label>
+                  Display name
+                  <input
+                    type="text"
+                    value={settingsDraft.display_name}
+                    maxLength={60}
+                    required
+                    onChange={(event) => setSettingsDraft((draft) => ({ ...draft, display_name: event.target.value }))}
+                  />
+                </label>
+                <label>
+                  Bio
+                  <textarea
+                    rows={3}
+                    value={settingsDraft.bio}
+                    maxLength={300}
+                    onChange={(event) => setSettingsDraft((draft) => ({ ...draft, bio: event.target.value }))}
+                  />
+                </label>
+                <label>
+                  Avatar image URL (leave empty for none)
+                  <input
+                    type="url"
+                    placeholder="https://…"
+                    value={settingsDraft.avatar_url}
+                    onChange={(event) => setSettingsDraft((draft) => ({ ...draft, avatar_url: event.target.value }))}
+                  />
+                </label>
+                {settingsError && <p className="style-guide-error" role="alert">{settingsError}</p>}
+                {settingsStatus === "saved" && <p className="style-guide-status" role="status">Saved.</p>}
+                <div className="account-settings-actions">
+                  <button className="primary-btn" type="submit" disabled={settingsStatus === "saving"}>
+                    {settingsStatus === "saving" ? "Saving…" : "Save changes"}
+                  </button>
+                </div>
+              </form>
+            )}
           </section>
         </div>
       )}
