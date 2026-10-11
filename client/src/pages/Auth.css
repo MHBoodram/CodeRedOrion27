@@ -1,0 +1,347 @@
+.auth-page {
+  --slide-winter: url("/photos/Winter%20outfit%20under%20budget.jpg");
+  --slide-streetwear: url("/photos/Oversized%20Streetwear%20Outfit%20for%20Men%20_%20Baggy%20Fashion%20Inspiration.jpg");
+  --slide-autumn: url("/photos/Autumn%20Fits.jpg");
+  --slide-leeyjohn: url("/photos/leeyjohn_%20IG%20fits.jpg");
+  --slide-xiaoxiao: url("/photos/xiaoxiao%20outfits%E2%80%99.jpg");
+  --auth-cherry: #681219;
+  --auth-lilac: #b0919f;
+  --auth-paper: #fff5f6;
+  --auth-surface: rgba(54, 13, 20, 0.88);
+  --auth-border: rgba(255, 245, 246, 0.24);
+
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  row-gap: 24px;
+  grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr);
+  height: 100svh;
+  min-height: 100svh;
+  place-items: center;
+  overflow: auto;
+  padding: 28px 18px;
+  background-color: #3f0b12;
+  background-image:
+    linear-gradient(180deg, #b09190 0%, #b09190 48%, #3f0b12 78%, #3f0b12 100%),
+    linear-gradient(180deg, #b09190 0%, #b09190 48%, #3f0b12 78%, #3f0b12 100%),
+    linear-gradient(180deg, #b09190 0%, #b09190 48%, #3f0b12 78%, #3f0b12 100%);
+  background-size: 100% 100%, 1px 100%, 1px 100%;
+  background-position: left top, 33.333% top, 66.667% top;
+  background-repeat: no-repeat;
+  color: var(--auth-paper);
+}
+
+.auth-page-signup {
+  height: auto;
+  row-gap: 16px;
+  grid-template-rows: auto auto;
+  align-content: center;
+}
+
+.auth-page-signup .auth-brand-logo {
+  width: 200px;
+  max-height: 220px;
+}
+
+.auth-page:not(.auth-page-signup) {
+  height: auto;
+  grid-template-rows: auto auto;
+  align-content: center;
+  row-gap: 16px;
+}
+
+.auth-page:not(.auth-page-signup) .auth-brand {
+  padding-top: 8px;
+}
+
+.auth-page:not(.auth-page-signup) .auth-brand-logo {
+  width: 200px;
+  max-height: 220px;
+}
+
+.auth-page::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: calc(100% / 3);
+  z-index: -2;
+  background-image: linear-gradient(rgba(24, 10, 13, 0.28), rgba(24, 10, 13, 0.28)), var(--slide-leeyjohn);
+  background-size: cover;
+  background-position: center;
+  -webkit-mask-image: linear-gradient(to right, #000 0%, #000 90%, transparent 100%);
+  mask-image: linear-gradient(to right, #000 0%, #000 90%, transparent 100%);
+  animation: authSlideLeft 24s linear infinite;
+}
+
+.auth-page::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: calc(100% / 3);
+  z-index: -2;
+  background-image: linear-gradient(rgba(24, 10, 13, 0.28), rgba(24, 10, 13, 0.28)), var(--slide-xiaoxiao);
+  background-size: cover;
+  background-position: center;
+  -webkit-mask-image: linear-gradient(to left, #000 0%, #000 90%, transparent 100%);
+  mask-image: linear-gradient(to left, #000 0%, #000 90%, transparent 100%);
+  animation: authSlideRight 24s linear infinite;
+}
+
+.auth-panel {
+  position: relative;
+  grid-row: 2;
+  z-index: 1;
+  width: min(100%, 380px);
+  padding: 20px 20px 16px;
+  border: 1px solid var(--auth-border);
+  border-radius: 18px;
+  background: var(--auth-surface);
+  box-shadow: 0 24px 70px var(--shadow-strong);
+  text-align: center;
+  animation: auth-arrive 550ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+  backdrop-filter: blur(12px);
+}
+
+.auth-panel-signup {
+  width: min(100%, 430px);
+  padding: 16px 18px 14px;
+}
+
+.auth-brand {
+  grid-row: 1;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: 32px;
+  z-index: 3;
+  color: var(--auth-paper);
+}
+
+.auth-page-signup .auth-brand {
+  padding-top: 8px;
+}
+
+.auth-brand-logo {
+  display: block;
+  width: 320px;
+  max-width: calc(100vw - 40px);
+  height: auto;
+  max-height: 340px;
+  object-fit: contain;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+}
+
+.auth-kicker {
+  margin: 0 0 5px;
+  color: #ddc7d0;
+  font-size: 9px;
+  font-weight: 750;
+}
+
+.auth-panel h1 {
+  margin: 0;
+  color: var(--auth-paper);
+  font-size: 31px;
+  font-weight: 750;
+  line-height: 1.1;
+}
+
+.auth-description {
+  margin: 9px 0 20px;
+  color: #ebdce2;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.auth-form {
+  display: grid;
+  gap: 8px;
+  text-align: left;
+}
+
+.auth-form label {
+  margin-top: 3px;
+  color: var(--auth-paper);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.auth-form input,
+.auth-form textarea {
+  width: 100%;
+  min-width: 0;
+  min-height: 43px;
+  padding: 10px 13px;
+  border: 1px solid rgba(176, 145, 159, 0.7);
+  border-radius: 5px;
+  background: rgba(34, 8, 13, 0.48);
+  color: var(--auth-paper);
+  font: inherit;
+  font-size: 13px;
+  transition: background 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.auth-form input:focus,
+.auth-form textarea:focus {
+  border-color: #e1cbd4;
+  outline: 0;
+  background: var(--auth-lilac);
+  box-shadow: 0 0 0 3px rgba(176, 145, 159, 0.22);
+  color: var(--auth-cherry);
+}
+
+.auth-form input:focus::placeholder {
+  color: var(--auth-cherry);
+}
+
+.auth-form textarea {
+  resize: vertical;
+}
+
+.auth-form button {
+  display: flex;
+  min-height: 46px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 7px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--auth-lilac);
+  color: var(--auth-cherry);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  transition: background 150ms ease, transform 150ms ease;
+}
+
+.auth-form button:hover {
+  transform: translateY(-1px);
+  background: #c5acb8;
+}
+
+.auth-demo-admin {
+  width: 100%;
+  min-height: 42px;
+  margin-top: 10px;
+  border: 1px solid rgba(176, 145, 159, 0.62);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--auth-paper);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+
+.auth-demo-admin:hover {
+  border-color: var(--auth-lilac);
+  background: rgba(176, 145, 159, 0.14);
+}
+
+.auth-message {
+  margin: 12px 0 0;
+  color: var(--auth-paper);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.auth-switch {
+  margin: 16px 0 0;
+  color: #e0cbd2;
+  font-size: 12px;
+}
+
+.auth-switch a {
+  color: var(--auth-paper);
+  font-weight: 700;
+  text-underline-offset: 3px;
+}
+
+.auth-switch a:hover {
+  color: #d8bfca;
+}
+
+.auth-security-note {
+  margin: 17px 0 0;
+  color: #cdb2bd;
+  font-size: 10px;
+  line-height: 1.4;
+}
+@keyframes authSlideLeft {
+  0% {
+    background-image: linear-gradient(rgba(24, 10, 13, 0.28), rgba(24, 10, 13, 0.28)), var(--slide-leeyjohn);
+    background-position: center 20%;
+  }
+  33% {
+    background-image: linear-gradient(rgba(24, 10, 13, 0.28), rgba(24, 10, 13, 0.28)), var(--slide-winter);
+    background-position: center 85%;
+  }
+  66% {
+    background-image: linear-gradient(rgba(24, 10, 13, 0.28), rgba(24, 10, 13, 0.28)), var(--slide-streetwear);
+    background-position: center 25%;
+  }
+  100% {
+    background-image: linear-gradient(rgba(24, 10, 13, 0.28), rgba(24, 10, 13, 0.28)), var(--slide-leeyjohn);
+    background-position: center 20%;
+  }
+}
+
+@keyframes authSlideRight {
+  0% {
+    background-image: linear-gradient(rgba(24, 10, 13, 0.28), rgba(24, 10, 13, 0.28)), var(--slide-xiaoxiao);
+    background-position: center 30%;
+  }
+  33% {
+    background-image: linear-gradient(rgba(24, 10, 13, 0.28), rgba(24, 10, 13, 0.28)), var(--slide-autumn);
+    background-position: center 80%;
+  }
+  66% {
+    background-image: linear-gradient(rgba(24, 10, 13, 0.28), rgba(24, 10, 13, 0.28)), var(--slide-leeyjohn);
+    background-position: center 20%;
+  }
+  100% {
+    background-image: linear-gradient(rgba(24, 10, 13, 0.28), rgba(24, 10, 13, 0.28)), var(--slide-xiaoxiao);
+    background-position: center 30%;
+  }
+}
+@keyframes auth-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(9px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 480px) {
+  .auth-panel {
+    padding: 16px 16px 14px;
+  }
+
+  .auth-panel-signup {
+    padding: 14px 14px 12px;
+  }
+
+  .auth-panel h1 {
+    font-size: 28px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

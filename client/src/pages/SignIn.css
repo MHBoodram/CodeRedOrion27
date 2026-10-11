@@ -1,0 +1,331 @@
+.sign-in-page {
+  --slide-winter: url("/photos/Winter%20outfit%20under%20budget.jpg");
+  --slide-streetwear: url("/photos/Oversized%20Streetwear%20Outfit%20for%20Men%20_%20Baggy%20Fashion%20Inspiration.jpg");
+  --slide-autumn: url("/photos/Autumn%20Fits.jpg");
+  --slide-leeyjohn: url("/photos/leeyjohn_%20IG%20fits.jpg");
+  --slide-xiaoxiao: url("/photos/xiaoxiao%20outfits%E2%80%99.jpg");
+  --black-cherry: #681219;
+  --lilac-ash: #b0919f;
+  --coffee-bean: #714a39;
+  --clay-soil: #7d4949;
+  --paper: #fff5f6;
+  --panel-surface: rgba(54, 13, 20, 0.88);
+  --panel-border: rgba(255, 245, 246, 0.24);
+
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  row-gap: 24px;
+  grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr);
+  height: 100svh;
+  min-height: 100svh;
+  place-items: center;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 28px 20px;
+  background-color: #3f0b12;
+  background-image:
+    linear-gradient(180deg, #b09190 0%, #b09190 48%, #3f0b12 78%, #3f0b12 100%),
+    linear-gradient(180deg, #b09190 0%, #b09190 48%, #3f0b12 78%, #3f0b12 100%),
+    linear-gradient(180deg, #b09190 0%, #b09190 48%, #3f0b12 78%, #3f0b12 100%);
+  background-size: 100% 100%, 1px 100%, 1px 100%;
+  background-position: left top, 33.333% top, 66.667% top;
+  background-repeat: no-repeat;
+  color: var(--paper);
+}
+
+.sign-in-page::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: calc(100% / 3);
+  z-index: -2;
+  background-image: linear-gradient(rgba(24, 10, 13, 0.28), rgba(24, 10, 13, 0.28)), var(--slide-winter);
+  background-size: cover;
+  background-position: center;
+  -webkit-mask-image: linear-gradient(to right, #000 0%, #000 90%, transparent 100%);
+  mask-image: linear-gradient(to right, #000 0%, #000 90%, transparent 100%);
+  animation: signSlideLeft 24s linear infinite;
+}
+
+.sign-in-page::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: calc(100% / 3);
+  z-index: -2;
+  background-image: linear-gradient(rgba(24, 10, 13, 0.28), rgba(24, 10, 13, 0.28)), var(--slide-streetwear);
+  background-size: cover;
+  background-position: center;
+  -webkit-mask-image: linear-gradient(to left, #000 0%, #000 90%, transparent 100%);
+  mask-image: linear-gradient(to left, #000 0%, #000 90%, transparent 100%);
+  animation: signSlideRight 24s linear infinite;
+}
+
+.sign-in-content {
+  position: relative;
+  grid-row: 2;
+  z-index: 1;
+  width: min(100%, 400px);
+  padding: 34px 30px 26px;
+  border: 1px solid var(--panel-border);
+  border-radius: 18px;
+  background: var(--panel-surface);
+  box-shadow: 0 24px 70px var(--shadow-strong);
+  text-align: center;
+  animation: sign-in-arrive 650ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+  backdrop-filter: blur(12px);
+}
+
+.sign-in-brand {
+  grid-row: 1;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: 32px;
+  z-index: 3;
+  color: var(--paper);
+}
+
+.sign-in-brand-logo {
+  display: block;
+  width: 380px;
+  max-width: calc(100vw - 48px);
+  height: auto;
+  max-height: 400px;
+  object-fit: contain;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+}
+
+.sign-in-brand-name {
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.sign-in-kicker {
+  margin: 0 0 6px;
+  color: #ddc7d0;
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.sign-in-content h1 {
+  margin: 0;
+  color: var(--paper);
+  font-size: 42px;
+  font-weight: 750;
+  line-height: 1.06;
+}
+
+.sign-in-content h1 em {
+  color: #d7bbc7;
+  font-family: "Montserrat", sans-serif;
+  font-size: 1.1em;
+  font-weight: 500;
+}
+
+.sign-in-copy {
+  max-width: 300px;
+  margin: 15px auto 27px;
+  color: #ebdce2;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.sign-in-form {
+  display: grid;
+  gap: 10px;
+  text-align: left;
+}
+
+.sign-in-form label {
+  color: var(--paper);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.sign-in-form input {
+  width: 100%;
+  height: 50px;
+  padding: 0 15px;
+  border: 1px solid rgba(176, 145, 159, 0.72);
+  border-radius: 5px;
+  background: rgba(34, 8, 13, 0.45);
+  color: var(--paper);
+  font: inherit;
+  font-size: 14px;
+  transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.sign-in-form input::placeholder {
+  color: #ddc7d0;
+}
+
+.sign-in-form input:focus {
+  border-color: #e1cbd4;
+  outline: 0;
+  background: var(--lilac-ash);
+  box-shadow: 0 0 0 3px rgba(176, 145, 159, 0.24);
+  color: var(--black-cherry);
+}
+
+.sign-in-form input:focus::placeholder {
+  color: var(--black-cherry);
+}
+
+.sign-in-form button {
+  display: flex;
+  width: 100%;
+  min-height: 50px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  margin-top: 5px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--lilac-ash);
+  color: var(--black-cherry);
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  transition: background 160ms ease, transform 160ms ease;
+}
+
+.sign-in-form button:hover {
+  transform: translateY(-2px);
+  background: #c5acb8;
+}
+
+.sign-in-form button span {
+  font-size: 18px;
+}
+
+.sign-in-action {
+  display: flex;
+  min-height: 50px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  margin-top: 5px;
+  border-radius: 999px;
+  background: var(--lilac-ash);
+  color: var(--black-cherry);
+  font-size: 14px;
+  font-weight: 800;
+  text-decoration: none;
+  transition: background 160ms ease, transform 160ms ease;
+}
+
+.sign-in-action:hover {
+  transform: translateY(-2px);
+  background: #c5acb8;
+}
+
+.sign-in-action span {
+  font-size: 18px;
+}
+
+.sign-in-message {
+  margin: 13px 0 0;
+  color: var(--paper);
+  font-size: 12px;
+}
+
+.account-note {
+  margin: 19px 0 0;
+  color: #e0cbd2;
+  font-size: 12px;
+}
+
+.account-note a {
+  margin-left: 3px;
+  color: var(--paper);
+  font-weight: 700;
+  text-underline-offset: 3px;
+}
+
+.account-note a:hover {
+  color: #d8bfca;
+}
+
+.sign-in-footer {
+  margin: 31px 0 0;
+  padding-top: 15px;
+  border-top: 1px solid rgba(255, 245, 246, 0.15);
+  color: var(--lilac-ash);
+  font-size: 9px;
+  font-weight: 750;
+}
+@keyframes signSlideLeft {
+  0% {
+    background-image: linear-gradient(rgba(24, 10, 13, 0.28), rgba(24, 10, 13, 0.28)), var(--slide-winter);
+    background-position: center 15%;
+  }
+  33% {
+    background-image: linear-gradient(rgba(24, 10, 13, 0.28), rgba(24, 10, 13, 0.28)), var(--slide-autumn);
+    background-position: center 85%;
+  }
+  66% {
+    background-image: linear-gradient(rgba(24, 10, 13, 0.28), rgba(24, 10, 13, 0.28)), var(--slide-xiaoxiao);
+    background-position: center 25%;
+  }
+  100% {
+    background-image: linear-gradient(rgba(24, 10, 13, 0.28), rgba(24, 10, 13, 0.28)), var(--slide-winter);
+    background-position: center 15%;
+  }
+}
+
+@keyframes signSlideRight {
+  0% {
+    background-image: linear-gradient(rgba(24, 10, 13, 0.28), rgba(24, 10, 13, 0.28)), var(--slide-streetwear);
+    background-position: center 30%;
+  }
+  33% {
+    background-image: linear-gradient(rgba(24, 10, 13, 0.28), rgba(24, 10, 13, 0.28)), var(--slide-leeyjohn);
+    background-position: center 80%;
+  }
+  66% {
+    background-image: linear-gradient(rgba(24, 10, 13, 0.28), rgba(24, 10, 13, 0.28)), var(--slide-autumn);
+    background-position: center 20%;
+  }
+  100% {
+    background-image: linear-gradient(rgba(24, 10, 13, 0.28), rgba(24, 10, 13, 0.28)), var(--slide-streetwear);
+    background-position: center 30%;
+  }
+}
+@keyframes sign-in-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 480px) {
+  .sign-in-content {
+    padding: 34px 23px 26px;
+  }
+
+  .sign-in-content h1 {
+    font-size: 37px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
