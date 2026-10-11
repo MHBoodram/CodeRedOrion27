@@ -245,31 +245,6 @@
   background: rgba(176, 145, 159, 0.14);
 }
 
-.profile-fields {
-  margin-top: 8px;
-  border-top: 1px solid rgba(255, 245, 246, 0.16);
-  border-bottom: 1px solid rgba(255, 245, 246, 0.16);
-}
-
-.profile-fields summary {
-  padding: 12px 0;
-  color: var(--auth-paper);
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 650;
-}
-
-.profile-fields summary span {
-  color: #d5bdc7;
-  font-weight: 400;
-}
-
-.profile-fields-list {
-  display: grid;
-  gap: 8px;
-  padding: 0 0 13px;
-}
-
 .auth-message {
   margin: 12px 0 0;
   color: var(--auth-paper);

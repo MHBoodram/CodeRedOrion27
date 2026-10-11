@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import girlLogo from "../../../Girl(2).svg";
+import girlLogo from "../assets/Girl(6).svg";
 import WeatherBadge from "../components/WeatherBadge.jsx";
 import "./HomePage.css";
 
@@ -62,7 +62,19 @@ function getWeatherDescription(code) {
   return "Check local conditions";
 }
 
+function getCurrentUsername() {
+  try {
+    const savedUser = JSON.parse(window.localStorage.getItem("fitcheck-user") || "null");
+    const session = JSON.parse(window.localStorage.getItem("fitcheck-session") || "null");
+    return savedUser?.username || session?.username || savedUser?.name || session?.name || "Guest";
+  } catch {
+    return "Guest";
+  }
+}
+
 export default function HomePage() {
+  const username = getCurrentUsername();
+  const usernameInitials = username.slice(0, 2).toUpperCase();
   const [activeTab, setActiveTab] = useState("Camera");
   const [cameraAttempt, setCameraAttempt] = useState(0);
   const [cameraStatus, setCameraStatus] = useState("loading");
@@ -250,17 +262,10 @@ export default function HomePage() {
 
   return (
     <div className="fashion-app">
-      <aside className="sidebar">
+      <aside className="sidebar" aria-label="Dashboard navigation">
         <div className="brand">
-          <div className="brand-mark">
-            <img className="brand-logo" src={girlLogo} alt="Fit Check logo" />
-          </div>
-          <div className="brand-copy">
-            <span>Fashion</span>
-            <strong>Check</strong>
-          </div>
+          <img className="brand-logo" src={girlLogo} alt="Fit Check logo" />
         </div>
-
         <nav className="nav-menu" aria-label="Main navigation">
           {navItems.map((item) => (
             <button
@@ -273,31 +278,14 @@ export default function HomePage() {
             </button>
           ))}
         </nav>
-
-        <div className="promo-card">
-          <p>Season drop</p>
-          <h3>Autumn Luxe</h3>
-          <button type="button">View edit</button>
-        </div>
       </aside>
 
       <main className="main-panel">
         <header className="topbar">
-          <label className="search-box" aria-label="Search fashion recommendations">
-            <span aria-hidden="true">⌕</span>
-            <input type="text" placeholder="Search looks, brands..." />
-          </label>
-
-          <div className="user-pill">
-            <div className="avatar">AR</div>
-            <div>
-              <strong>Ariana</strong>
-              <small>Premium</small>
-            </div>
+          <div className="user-pill" aria-label={`Signed in as ${username}`}>
+            <div className="avatar" aria-hidden="true">{usernameInitials}</div>
+            <strong>{username}</strong>
           </div>
-          <button type="button" className="secondary-btn dashboard-switch" onClick={() => window.location.href = "/login"}>
-            Back to login
-          </button>
         </header>
 
         {!isHistoryView && !isCameraView ? (
@@ -439,8 +427,8 @@ export default function HomePage() {
             <header className="camera-page-header">
               <div>
                 <p className="mini-label">Virtual fitting room</p>
-                <h1>Try on your fit</h1>
-                <p>Capture today’s look and get a little styling inspiration.</p>
+                <h1>Check your fit!</h1>
+                <p>Snap a picture, see your rating, and get a little styling advice.</p>
               </div>
               <button type="button" className="link-btn" onClick={() => setActiveTab("Discover")}>
                 Back to discover
@@ -550,13 +538,13 @@ export default function HomePage() {
                     <strong>{capturedFit ? "8.5" : "—"}</strong>
                     <span>/ 10</span>
                   </div>
-                  <p>{capturedFit ? "Sample editorial score; photo-based outfit analysis is not connected yet." : "Take a fit photo to reveal your style score."}</p>
+                  <p>{capturedFit ? "Sample editorial score; photo-based outfit analysis is not connected yet." : "Take a photo of your fit to reveal your style score."}</p>
                 </section>
 
                 <section className="similar-card">
                   <div className="camera-card-heading">
                     <div>
-                      <p className="mini-label">Inspired by your fit</p>
+                      <p className="mini-label">What is your fit giving?</p>
                       <h2>Similar styles</h2>
                     </div>
                   </div>
