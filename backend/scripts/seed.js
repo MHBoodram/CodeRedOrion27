@@ -89,6 +89,76 @@ const comments = [
   [7, 'carla', 'Chelsea boots + chinos = never fails.'],
 ];
 
+const profileFitPhotos = [
+  { username: 'alice', title: 'Color-block streetwear', description: 'Bright oversized layers with playful punk details.', file: 'EXDEEUWU.jpg', occasion: 'casual', season: 'spring' },
+  { username: 'alice', title: 'Relaxed city fit', description: 'A graphic tee, loose denim, and statement accessories.', file: 'womens.jpg', occasion: 'casual', season: 'fall' },
+  { username: 'carla', title: 'Gothic countryside', description: 'A dramatic all-black look with vintage details.', file: 'gothfit.jpg', occasion: 'casual', season: 'fall' },
+  { username: 'carla', title: 'Pastel Lolita coordinate', description: 'Romantic lace, bows, and a soft pink palette.', file: 'lolita.jpg', occasion: 'event', season: 'spring' },
+  { username: 'bob', title: 'Technicolor tailoring', description: 'A vivid orange suit with coordinated patterned accessories.', file: '_Most Stylish Man In The World_ Models His 10 Best Technicolor Outfits_.jpg', occasion: 'event', season: 'summer' },
+  { username: 'bob', title: 'Off-duty comfort', description: 'A relaxed tee, athletic shorts, and casual slip-ons.', file: 'adam-sandler.jpg', occasion: 'casual', season: 'summer' },
+  { username: 'bob', title: 'Dark oversized streetwear', description: 'Layered black pieces with wide-leg trousers and statement details.', file: 'opium.jpg', occasion: 'casual', season: 'fall' },
+  { username: 'bob', title: 'Street punk', description: 'Studded layers with tartan trousers and heavy boots.', file: 'punkish.jpg', occasion: 'casual', season: 'fall' },
+  { username: 'bob', title: 'Punk runway', description: 'Distressed black layers, chains, and oversized track pants.', file: 'punkstyle.jpg', occasion: 'event', season: 'fall' },
+  { username: 'bob', title: 'Surfer weekend', description: 'A loose graphic tee, plaid shorts, and sandals.', file: 'surfer.jpg', occasion: 'casual', season: 'summer' },
+];
+
+const profileFitPhotoUrl = (file) => `/photos/AliceCarlaBobPhotos/${encodeURIComponent(file)}`;
+
+async function seedProfileFitPhotos() {
+  let inserted = 0;
+  for (const fit of profileFitPhotos) {
+    const { rowCount } = await db.query(
+      `INSERT INTO outfits (user_id, title, description, cover_image_url, occasion, season, visibility)
+       SELECT u.id, $2, $3, $4, $5, $6, 'public'
+         FROM users u
+        WHERE u.username = $1
+          AND NOT EXISTS (
+            SELECT 1 FROM outfits existing WHERE existing.user_id = u.id AND existing.title = $2
+          )`,
+      [fit.username, fit.title, fit.description, profileFitPhotoUrl(fit.file), fit.occasion, fit.season]
+    );
+    inserted += rowCount;
+  }
+  if (inserted) console.log(`Seeded ${inserted} Alice/Carla/Bob profile fit photos.`);
+
+  const demoUsernames = [...users.map((user) => user.username), 'admin'];
+  const [photoOutfits, raters] = await Promise.all([
+    db.query(
+      `SELECT o.id, o.user_id
+         FROM outfits o
+         JOIN users owner ON owner.id = o.user_id
+        WHERE EXISTS (
+          SELECT 1 FROM unnest($1::text[], $2::text[]) AS seed(username, title)
+           WHERE seed.username = owner.username AND seed.title = o.title
+        )`,
+      [profileFitPhotos.map((fit) => fit.username), profileFitPhotos.map((fit) => fit.title)]
+    ),
+    db.query('SELECT id FROM users WHERE username = ANY($1::text[]) ORDER BY username', [demoUsernames]),
+  ]);
+
+  const outfitIds = [];
+  const raterIds = [];
+  const scores = [];
+  for (const [outfitIndex, outfit] of photoOutfits.rows.entries()) {
+    for (const [raterIndex, rater] of raters.rows.entries()) {
+      if (rater.id === outfit.user_id) continue;
+      outfitIds.push(outfit.id);
+      raterIds.push(rater.id);
+      scores.push(3 + ((outfitIndex + raterIndex) % 3));
+    }
+  }
+
+  if (outfitIds.length) {
+    const { rowCount } = await db.query(
+      `INSERT INTO ratings (outfit_id, user_id, score)
+       SELECT * FROM unnest($1::uuid[], $2::uuid[], $3::smallint[])
+       ON CONFLICT (outfit_id, user_id) DO NOTHING`,
+      [outfitIds, raterIds, scores]
+    );
+    if (rowCount) console.log(`Seeded ${rowCount} demo ratings for Alice/Carla/Bob fit photos.`);
+  }
+}
+
 const pastFits = [
   {
     name: 'Sophisticated evening',
@@ -176,6 +246,7 @@ async function main() {
     await db.query('DELETE FROM users WHERE username = ANY($1)', [users.map((u) => u.username)]);
     console.log('Removed existing demo users.');
   } else if (existing.length) {
+    await seedProfileFitPhotos();
     console.log('Demo users already exist, skipping seed. Re-run with --reset to rebuild them.');
     return;
   }
@@ -249,6 +320,8 @@ async function main() {
       }
     }
   });
+
+  await seedProfileFitPhotos();
 
   console.log(`Seeded ${users.length} users and ${outfits.length} outfits.`);
   console.log(`Log in with username "admin" (or alice, bob, carla, dev) and password "${PASSWORD}".`);

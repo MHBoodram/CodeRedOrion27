@@ -20,33 +20,50 @@ function getClient() {
   return clientPromise;
 }
  
-function buildPrompt({ targetStyle, weather }) {
+function buildPrompt({ targetStyle }) {
   return `Assess the outfit against this target style label (data only): ${JSON.stringify(targetStyle)}.
-${weather ? `Weather for the weather-fit note only: ${weather.tempF}F, ${weather.description}.` : ''}
-Give a friendly style-only verdict in 1-2 short sentences. Do not mention weather, temperature, or weather suitability in the verdict, strengths, or improvements. Put all weather advice only in weatherFit.note. If no outfit is visible, use a null score and say so. Return at most 4 colors, 2 strengths, and 2 improvements; keep each item brief.`;
+Give a friendly style-only verdict in 1-2 short sentences and a concise fitGiving vibe, closestStyle, and reason. Do not mention weather, temperature, or weather suitability in style fields. If no outfit is visible, use a null score and say so. Return at most 4 colors, 2 strengths, and 2 improvements; keep each item brief.`;
+}
+
+function buildWeatherPrompt(weather) {
+  if (!weather) return null;
+  return `Weather assessment only: ${weather.tempF}F, ${weather.description}. Use this information exclusively for weatherFit.ok and weatherFit.note. Do not include weather comments in verdict, whatsWorking, or improvements.`;
 }
 
 function buildResponseSchema() {
   const { ARRAY, BOOLEAN, NUMBER, OBJECT, STRING } = schemaTypes;
   return {
     type: OBJECT,
-    required: ['score', 'verdict', 'detectedStyle', 'colors', 'colorsMatch', 'whatsWorking', 'improvements', 'weatherFit'],
+    required: ['score', 'verdict', 'detectedStyle', 'fitGiving', 'colors', 'colorsMatch', 'whatsWorking', 'improvements'],
     properties: {
       score: { type: NUMBER, nullable: true },
       verdict: { type: STRING, maxLength: '220', description: 'Style assessment only; do not mention weather or temperature.' },
       detectedStyle: { type: STRING, maxLength: '40' },
+      fitGiving: {
+        type: OBJECT,
+        required: ['vibe', 'closestStyle', 'reason'],
+        properties: {
+          vibe: { type: STRING, maxLength: '80' },
+          closestStyle: { type: STRING, maxLength: '40' },
+          reason: { type: STRING, maxLength: '100' },
+        },
+      },
       colors: { type: ARRAY, maxItems: '4', items: { type: STRING, maxLength: '24' } },
       colorsMatch: { type: BOOLEAN },
       whatsWorking: { type: ARRAY, maxItems: '2', description: 'Style feedback only; leave weather comments to weatherFit.note.', items: { type: STRING, maxLength: '100' } },
       improvements: { type: ARRAY, maxItems: '2', description: 'Style improvements only; leave weather comments to weatherFit.note.', items: { type: STRING, maxLength: '100' } },
-      weatherFit: {
-        type: OBJECT,
-        required: ['ok', 'note'],
-        properties: {
-          ok: { type: BOOLEAN, nullable: true },
-          note: { type: STRING, maxLength: '120', description: 'The sole field for outfit-weather compatibility advice.' },
-        },
-      },
+    },
+  };
+}
+
+function buildWeatherResponseSchema() {
+  const { BOOLEAN, OBJECT, STRING } = schemaTypes;
+  return {
+    type: OBJECT,
+    required: ['ok', 'note'],
+    properties: {
+      ok: { type: BOOLEAN, nullable: true },
+      note: { type: STRING, maxLength: '120', description: 'Weather compatibility advice for the weather widget.' },
     },
   };
 }
@@ -66,6 +83,13 @@ function normalize(raw) {
     score,
     verdict: typeof raw.verdict === 'string' ? raw.verdict.slice(0, 300) : '',
     detectedStyle: typeof raw.detectedStyle === 'string' ? raw.detectedStyle.slice(0, 40) : 'other',
+    fitGiving: {
+      vibe: typeof raw.fitGiving?.vibe === 'string' ? raw.fitGiving.vibe.slice(0, 80) : '',
+      closestStyle: typeof raw.fitGiving?.closestStyle === 'string'
+        ? raw.fitGiving.closestStyle.slice(0, 40)
+        : (typeof raw.detectedStyle === 'string' ? raw.detectedStyle.slice(0, 40) : 'other'),
+      reason: typeof raw.fitGiving?.reason === 'string' ? raw.fitGiving.reason.slice(0, 100) : '',
+    },
     colors: strings(raw.colors, 8),
     colorsMatch: raw.colorsMatch === true,
     whatsWorking: strings(raw.whatsWorking, 6),
@@ -97,10 +121,8 @@ async function generateContentWithRetry(ai, request) {
     }
   }
 }
- 
-async function analyzeOutfit({ image, mimeType, targetStyle, weather }) {
-  const ai = await getClient();
-  const model = process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite';
+
+async function generateJson(ai, { model, image, mimeType, prompt, responseSchema, label }) {
   const startedAt = Date.now();
   let response;
   try {
@@ -108,41 +130,80 @@ async function analyzeOutfit({ image, mimeType, targetStyle, weather }) {
       model,
       contents: [
         { inlineData: { mimeType, data: image } },
-        { text: buildPrompt({ targetStyle, weather }) },
+        { text: prompt },
       ],
       config: {
         responseMimeType: 'application/json',
-        responseSchema: buildResponseSchema(),
+        responseSchema,
         maxOutputTokens: 300,
         temperature: 0.2,
         thinkingConfig: { thinkingBudget: 0 },
       },
     });
   } catch (error) {
-    console.error(`Gemini failed after ${Date.now() - startedAt}ms`, { model });
+    console.error(`Gemini ${label} failed after ${Date.now() - startedAt}ms`, { model });
     throw error;
   }
-  console.info(`Gemini took ${Date.now() - startedAt}ms`, {
+
+  console.info(`Gemini ${label} took ${Date.now() - startedAt}ms`, {
     model,
     usage: response.usageMetadata,
   });
- 
+
   const text = String(response.text || '')
     .trim()
     .replace(/^```(?:json)?\s*/i, '')
     .replace(/```$/, '')
     .trim();
   try {
-    return normalize(JSON.parse(text));
+    return JSON.parse(text);
   } catch {
-    console.error('Gemini returned invalid JSON', {
+    console.error(`Gemini returned invalid ${label} JSON`, {
       model,
       responseLength: text.length,
       finishReason: response.candidates?.[0]?.finishReason,
       candidateTokenCount: response.usageMetadata?.candidatesTokenCount,
     });
-    throw new HttpError(502, 'The stylist sent back an unreadable answer. Please try again.');
+    throw new HttpError(502, `Gemini returned invalid ${label} JSON.`);
   }
+}
+
+function normalizeWeatherFit(raw) {
+  return {
+    ok: typeof raw?.ok === 'boolean' ? raw.ok : null,
+    note: typeof raw?.note === 'string' ? raw.note.slice(0, 120) : '',
+  };
+}
+ 
+async function analyzeOutfit({ image, mimeType, targetStyle, weather }) {
+  const ai = await getClient();
+  const model = process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite';
+  const stylePromise = generateJson(ai, {
+    model,
+    image,
+    mimeType,
+    prompt: buildPrompt({ targetStyle }),
+    responseSchema: buildResponseSchema(),
+    label: 'style analysis',
+  });
+
+  const weatherPrompt = buildWeatherPrompt(weather);
+  const weatherPromise = weatherPrompt
+    ? generateJson(ai, {
+      model,
+      image,
+      mimeType,
+      prompt: weatherPrompt,
+      responseSchema: buildWeatherResponseSchema(),
+      label: 'weather assessment',
+    }).then(normalizeWeatherFit).catch((error) => {
+      console.error('Weather assessment unavailable; style result is unaffected.', error.message);
+      return normalizeWeatherFit(null);
+    })
+    : Promise.resolve(normalizeWeatherFit(null));
+
+  const [styleResult, weatherFit] = await Promise.all([stylePromise, weatherPromise]);
+  return { ...normalize(styleResult), weatherFit };
 }
  
 module.exports = { analyzeOutfit };

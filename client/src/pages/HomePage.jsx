@@ -31,6 +31,19 @@ function timeAgo(iso) {
   return `${Math.round(hours / 24)} d ago`;
 }
 
+function getTodayOutfitsByAuthor(outfits) {
+  const today = new Date().toDateString();
+  const seenAuthors = new Set();
+
+  return outfits.filter((outfit) => {
+    if (new Date(outfit.created_at).toDateString() !== today) return false;
+    const author = outfit.author?.id || outfit.author?.username || "unknown";
+    if (seenAuthors.has(author)) return false;
+    seenAuthors.add(author);
+    return true;
+  });
+}
+
 const colorSwatches = {
   indigo: "#49436f",
   navy: "#293b58",
@@ -203,9 +216,14 @@ export default function HomePage() {
     setPastFitsStatus("loading");
     setPastFitsError("");
     api
-      .fits({ limit: 50, signal: controller.signal })
+      .fits({ limit: 7, signal: controller.signal })
       .then(({ fits = [] }) => {
-        setPastFits(fits);
+        const now = Date.now();
+        const weekAgo = now - 7 * 24 * 60 * 60 * 1000;
+        setPastFits(fits.filter((fit) => {
+          const createdAt = new Date(fit.createdAt).getTime();
+          return createdAt >= weekAgo && createdAt <= now;
+        }).slice(0, 7));
         setPastFitsStatus("success");
       })
       .catch((error) => {
@@ -220,14 +238,15 @@ export default function HomePage() {
     if (!isFriendsView) return undefined;
 
     const controller = new AbortController();
-    const query = new URLSearchParams({ sort: "recent", scope: friendsScope, limit: "20" });
+    const query = new URLSearchParams({ sort: "recent", scope: friendsScope, limit: friendsScope === "all" ? "50" : "20" });
     setFriendsStatus("loading");
     setFriendsError("");
 
     api(`/outfits?${query}`, { signal: controller.signal })
       .then(async ({ outfits = [] }) => {
-        setFriends(outfits);
-        const commentEntries = await Promise.all(outfits.map(async (outfit) => {
+        const displayedOutfits = friendsScope === "all" ? getTodayOutfitsByAuthor(outfits) : outfits;
+        setFriends(displayedOutfits);
+        const commentEntries = await Promise.all(displayedOutfits.map(async (outfit) => {
           try {
             const { comments = [] } = await api(`/outfits/${outfit.id}/comments`, { signal: controller.signal });
             return [outfit.id, comments];
@@ -966,7 +985,7 @@ export default function HomePage() {
               <p className="style-guide-status">
                 {friendsScope === "following"
                   ? "You're not following anyone yet. Switch to Everyone to find outfits."
-                  : "No outfits have been posted yet."}
+                  : "No outfits have been posted today."}
               </p>
             )}
             <div className="friends-grid">
@@ -1441,10 +1460,16 @@ export default function HomePage() {
                       <p className="mini-label">What is your fit giving?</p>
                     </div>
                   </div>
-                  {analysisResult?.detectedStyle && !noOutfitDetected ? (
+                  {(analysisResult?.fitGiving?.vibe || analysisResult?.fitGiving?.closestStyle || analysisResult?.fitGiving?.reason || analysisResult?.detectedStyle) && !noOutfitDetected ? (
                     <div className="gemini-style-match">
-                      <p className="mini-label">Closest style match</p>
-                      <h3>{analysisResult.detectedStyle}</h3>
+                      {analysisResult.fitGiving?.vibe && <p>{analysisResult.fitGiving.vibe}</p>}
+                      {(analysisResult.fitGiving?.closestStyle || analysisResult.detectedStyle) && (
+                        <>
+                          <p className="mini-label">Closest style match</p>
+                          <h3>{analysisResult.fitGiving?.closestStyle || analysisResult.detectedStyle}</h3>
+                        </>
+                      )}
+                      {analysisResult.fitGiving?.reason && <p>{analysisResult.fitGiving.reason}</p>}
                     </div>
                   ) : null}
                 </section>
