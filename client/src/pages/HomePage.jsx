@@ -1089,9 +1089,9 @@ export default function HomePage() {
                     <div className="friend-card-details">
                       <h3>{outfit.title}</h3>
                       <p className="friend-fit-score">
-                        <span>Community rating (1–5)</span>
+                        <span>Rated:</span>
                         <strong>
-                          {outfit.rating_count ? `${Number(outfit.rating_avg).toFixed(1)} / 5 (${outfit.rating_count})` : "No ratings yet"}
+                          {outfit.rating_count ? `${Number(outfit.rating_avg).toFixed(1)} / 5` : "No ratings yet"}
                         </strong>
                       </p>
                       {outfit.description && <p className="friend-style-worn">{outfit.description}</p>}
@@ -1444,8 +1444,7 @@ export default function HomePage() {
                         {isPhotoCountdownActive ? "Cancel countdown" : "Take fit photo"}
                       </button>
                     ) : null}
-                    <span>Your photo is only sent when you tap Analyze. It goes to our server and Google Gemini; only a small preview is saved to your Past Fits.</span>
-                  </div>
+                    </div>
                   {cameraSwitchMessage && <p className="camera-switch-message" role="status">{cameraSwitchMessage}</p>}
                 </section>
 
@@ -1572,7 +1571,6 @@ export default function HomePage() {
                   <div className="camera-card-heading">
                     <div>
                       <p className="mini-label">What is your fit giving?</p>
-                      <h2>Similar styles</h2>
                     </div>
                   </div>
                   {analysisResult?.detectedStyle && !noOutfitDetected ? (
