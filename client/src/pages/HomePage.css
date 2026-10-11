@@ -1147,8 +1147,8 @@
 
 .friend-fit-score {
   display: flex;
-  justify-content: space-between;
-  gap: 12px;
+  justify-content: flex-end;
+  gap: 6px;
   margin: 8px 0 0;
   color: var(--muted);
   font-size: 0.88rem;
