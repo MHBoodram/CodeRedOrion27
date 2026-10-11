@@ -124,7 +124,11 @@
 
 .sign-in-content h1 em {
   color: #d7bbc7;
+<<<<<<< HEAD
+  font-family: "Montserrat", sans-serif;
+=======
   font-family: "Sono", monospace;
+>>>>>>> 02d5318116ca24e31105e72fb403a70a7c2bba8f
   font-size: 1.1em;
   font-weight: 500;
 }

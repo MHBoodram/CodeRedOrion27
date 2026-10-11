@@ -1406,6 +1406,8 @@
   background: rgba(255, 255, 255, 0.02);
 }
 
+<<<<<<< HEAD
+=======
 .outfit-color-bar {
   display: flex;
   width: 100%;
@@ -1420,6 +1422,7 @@
   flex: 1 1 0;
 }
 
+>>>>>>> 02d5318116ca24e31105e72fb403a70a7c2bba8f
 .camera-source-prompt {
   margin: 0 0 14px;
   color: var(--text);
@@ -2057,11 +2060,14 @@
     grid-template-columns: 1fr;
   }
 
+<<<<<<< HEAD
+=======
   .target-style-fields,
   .gemini-result-columns {
     grid-template-columns: 1fr;
   }
 
+>>>>>>> 02d5318116ca24e31105e72fb403a70a7c2bba8f
   .style-guide-heading h1 {
     font-size: 2rem;
   }
