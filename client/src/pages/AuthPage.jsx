@@ -1,28 +1,8 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { api, describeError, saveAuth } from "../api.js";
 import girlLogo from "../assets/Girl(2).svg";
 import "./Auth.css";
-
-const USER_STORAGE_KEY = "fitcheck-user";
-const SESSION_STORAGE_KEY = "fitcheck-session";
-
-function getSavedUser() {
-  try {
-    const savedUser = window.localStorage.getItem(USER_STORAGE_KEY);
-    return savedUser ? JSON.parse(savedUser) : null;
-  } catch {
-    return null;
-  }
-}
-
-function saveUser(user) {
-  try {
-    window.localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 function AuthBrand() {
   return (
@@ -35,76 +15,49 @@ function AuthBrand() {
 export default function AuthPage({ mode }) {
   const isSignup = mode === "signup";
   const [message, setMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
-    const formData = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    setMessage("");
 
-    if (isSignup) {
-      if (formData.get("password") !== formData.get("confirm_password")) {
-        setMessage("Those passwords do not match.");
-        return;
-      }
-
-      const username = formData.get("username").trim();
-      const displayName = formData.get("display_name")?.trim() || null;
-      const user = {
-        name: displayName || username,
-        email: formData.get("email").trim().toLowerCase(),
-        username,
-        display_name: displayName,
-        avatar_url: formData.get("avatar_url")?.trim() || null,
-        bio: formData.get("bio")?.trim() || null,
-      };
-
-      if (!saveUser(user)) {
-        setMessage("Could not save your profile in this browser.");
-        return;
-      }
-
-      setMessage("Profile saved on this browser. Your password was not stored.");
-      event.currentTarget.reset();
-      navigate("/home");
+    if (isSignup && formData.get("password") !== formData.get("confirm_password")) {
+      setMessage("Those passwords do not match.");
       return;
     }
 
-    const identifier = formData.get("identifier").trim().toLowerCase();
-    const savedUser = getSavedUser();
-    const matchesSavedUser = savedUser && (
-      savedUser.email?.toLowerCase() === identifier ||
-      savedUser.username?.toLowerCase() === identifier
-    );
-
-    if (!matchesSavedUser) {
-      setMessage("No saved profile found. Create an account on this browser first.");
-      return;
-    }
-
-    if (!saveUser(savedUser)) {
-      setMessage("Could not access your saved profile in this browser.");
-      return;
-    }
-
-    setMessage(`Profile found for ${savedUser.name}. Password verification requires server authentication.`);
-    navigate("/home");
-  }
-
-  function handleDemoAdmin() {
-    const demoSession = {
-      name: "Demo Admin",
-      email: "admin@fitcheck.local",
-      username: "demo_admin",
-      role: "admin",
-      demo: true,
-    };
-
+    setSubmitting(true);
     try {
-      window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(demoSession));
-      setMessage("Demo admin session started on this browser. This is not secure authentication.");
+      let session;
+      if (isSignup) {
+        const body = {
+          username: formData.get("username").trim(),
+          email: formData.get("email").trim().toLowerCase(),
+          password: formData.get("password"),
+        };
+        const displayName = formData.get("display_name")?.trim();
+        if (displayName) body.display_name = displayName;
+        session = await api("/auth/register", { method: "POST", body, auth: false });
+      } else {
+        session = await api("/auth/login", {
+          method: "POST",
+          body: {
+            identifier: formData.get("identifier").trim(),
+            password: formData.get("password"),
+          },
+          auth: false,
+        });
+      }
+
+      saveAuth(session);
       navigate("/home");
-    } catch {
-      setMessage("Could not start the demo admin session in this browser.");
+    } catch (error) {
+      setMessage(describeError(error));
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -187,14 +140,11 @@ export default function AuthPage({ mode }) {
             </>
           )}
 
-          <button type="submit">{isSignup ? "Create account" : "Log in"}</button>
+          <button type="submit" disabled={submitting}>
+            {submitting ? "Please wait…" : isSignup ? "Create account" : "Log in"}
+          </button>
         </form>
 
-        {!isSignup && (
-          <button className="auth-demo-admin" type="button" onClick={handleDemoAdmin}>
-            Continue as demo admin
-          </button>
-        )}
         {message && <p className="auth-message" role="status">{message}</p>}
         <p className="auth-switch">
           {isSignup ? "Already have an account?" : "New to Fit Check?"}{" "}
@@ -202,7 +152,7 @@ export default function AuthPage({ mode }) {
             {isSignup ? "Log in" : "Create account"}
           </Link>
         </p>
-        <p className="auth-security-note">Passwords are never stored in browser storage.</p>
+        <p className="auth-security-note">Your password is sent securely to the server and is never stored in the browser.</p>
       </section>
     </main>
   );

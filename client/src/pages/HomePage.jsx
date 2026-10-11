@@ -2,9 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import girlLogo from "../assets/Girl(6).svg";
 import WeatherBadge from "../components/WeatherBadge.jsx";
-import { dummyFriends, dummyNotifications, dummyPastFits } from "../data/dummyDatabase.js";
+import { api, clearAuth, getToken } from "../api.js";
+import { dummyNotifications, dummyPastFits } from "../data/dummyDatabase.js";
+import { prepareImageForUpload } from "../Imageutils.js";
 import { requestStyleMoodboard } from "../styleGuideApi.js";
 import "./HomePage.css";
+import "./Analysis.css";
 
 const navItems = ["Today's Fit", "Past Fits", "Friends", "Style Guide"];
 
@@ -42,7 +45,7 @@ const savedLooks = [
 ];
 
 const similarStyles = [
-  { name: "Warm tailorinong", detail: "Soft structure · earthy tones", image: recommendations[0].image },
+  { name: "Warm tailoring", detail: "Soft structure · earthy tones", image: recommendations[0].image },
   { name: "Modern romantic", detail: "Fluid layers · muted accents", image: recommendations[2].image },
 ];
 
@@ -80,7 +83,6 @@ function getCurrentEmail() {
 
 export default function HomePage() {
   const username = getCurrentUsername();
-  const friendFeedbackKey = `fitcheck-friend-feedback:${username}`;
   const email = getCurrentEmail();
   const usernameInitials = username.slice(0, 2).toUpperCase();
   const navigate = useNavigate();
@@ -89,14 +91,17 @@ export default function HomePage() {
   const [styleMoodboard, setStyleMoodboard] = useState(null);
   const [styleGuideStatus, setStyleGuideStatus] = useState("idle");
   const [styleGuideError, setStyleGuideError] = useState("");
-  const [friendFeedback, setFriendFeedback] = useState(() => {
-    try {
-      return JSON.parse(window.localStorage.getItem(friendFeedbackKey) || "{}");
-    } catch {
-      return {};
-    }
-  });
+  const [friends, setFriends] = useState([]);
+  const [friendsScope, setFriendsScope] = useState("following");
+  const [friendsStatus, setFriendsStatus] = useState("idle");
+  const [friendsError, setFriendsError] = useState("");
+  const [friendComments, setFriendComments] = useState({});
   const [friendCommentDrafts, setFriendCommentDrafts] = useState({});
+  const [weather, setWeather] = useState(null);
+  const [targetStyle, setTargetStyle] = useState("");
+  const [analysis, setAnalysis] = useState(null);
+  const [analysisStatus, setAnalysisStatus] = useState("idle");
+  const [analysisError, setAnalysisError] = useState("");
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isNotificationMenuOpen, setIsNotificationMenuOpen] = useState(false);
@@ -121,37 +126,113 @@ export default function HomePage() {
   const isFriendsView = activeTab === "Friends";
   const unreadNotificationCount = notifications.filter((notification) => !notification.read).length;
 
+  // The dashboard needs a logged-in user; send everyone else to /login.
   useEffect(() => {
-    try {
-      window.localStorage.setItem(friendFeedbackKey, JSON.stringify(friendFeedback));
-    } catch {
-      // Keep feedback in the current view if browser storage is unavailable.
+    if (!getToken()) {
+      navigate("/login", { replace: true });
+      return undefined;
     }
-  }, [friendFeedback, friendFeedbackKey]);
+    function handleUnauthorized() {
+      navigate("/login", { replace: true });
+    }
+    window.addEventListener("fitcheck:unauthorized", handleUnauthorized);
+    return () => window.removeEventListener("fitcheck:unauthorized", handleUnauthorized);
+  }, [navigate]);
 
-  function rateFriendFit(friendId, rating) {
-    setFriendFeedback((current) => ({
-      ...current,
-      [friendId]: { ...current[friendId], rating },
-    }));
+  // Friends tab: outfits from the backend plus each outfit's comments.
+  useEffect(() => {
+    if (!isFriendsView) return undefined;
+    let cancelled = false;
+
+    async function loadFriends() {
+      setFriendsStatus("loading");
+      setFriendsError("");
+      try {
+        const { outfits } = await api(`/outfits?scope=${friendsScope}&limit=12`);
+        const commentLists = await Promise.all(
+          outfits.map((outfit) =>
+            api(`/outfits/${outfit.id}/comments`).then((result) => result.comments).catch(() => []),
+          ),
+        );
+        if (cancelled) return;
+        setFriends(outfits);
+        setFriendComments(Object.fromEntries(outfits.map((outfit, index) => [outfit.id, commentLists[index]])));
+        setFriendsStatus("success");
+      } catch (error) {
+        if (cancelled) return;
+        setFriendsError(error instanceof Error ? error.message : "Could not load outfits.");
+        setFriendsStatus("error");
+      }
+    }
+
+    loadFriends();
+    return () => {
+      cancelled = true;
+    };
+  }, [isFriendsView, friendsScope]);
+
+  // A new photo invalidates any previous analysis.
+  useEffect(() => {
+    setAnalysis(null);
+    setAnalysisStatus("idle");
+    setAnalysisError("");
+  }, [capturedFit]);
+
+  async function rateFriendFit(outfitId, score) {
+    setFriendsError("");
+    try {
+      const result = await api(`/outfits/${outfitId}/rating`, { method: "PUT", body: { score } });
+      setFriends((current) => current.map((outfit) => (
+        outfit.id === outfitId
+          ? { ...outfit, my_rating: result.my_rating, rating_avg: result.rating_avg, rating_count: result.rating_count }
+          : outfit
+      )));
+    } catch (error) {
+      setFriendsError(error instanceof Error ? error.message : "Could not save your rating.");
+    }
   }
 
-  function addFriendComment(event, friendId) {
+  async function addFriendComment(event, outfitId) {
     event.preventDefault();
-    const text = friendCommentDrafts[friendId]?.trim();
+    const text = friendCommentDrafts[outfitId]?.trim();
     if (!text) return;
 
-    setFriendFeedback((current) => {
-      const feedback = current[friendId] || {};
-      return {
+    setFriendsError("");
+    try {
+      const { comment } = await api(`/outfits/${outfitId}/comments`, { method: "POST", body: { body: text } });
+      setFriendComments((current) => ({
         ...current,
-        [friendId]: {
-          ...feedback,
-          comments: [...(feedback.comments || []), { id: `${Date.now()}`, username, text }],
+        [outfitId]: [...(current[outfitId] || []), { ...comment, author: { username } }],
+      }));
+      setFriendCommentDrafts((current) => ({ ...current, [outfitId]: "" }));
+    } catch (error) {
+      setFriendsError(error instanceof Error ? error.message : "Could not post your comment.");
+    }
+  }
+
+  async function analyzeFit() {
+    const style = targetStyle.trim();
+    if (!capturedFit || !style) return;
+
+    setAnalysisStatus("loading");
+    setAnalysisError("");
+    try {
+      const { image, mimeType } = await prepareImageForUpload(capturedFit);
+      const result = await api("/analyze-outfit", {
+        method: "POST",
+        body: {
+          image,
+          mimeType,
+          targetStyle: style,
+          weather: weather ? { tempF: weather.tempF, description: weather.description } : undefined,
         },
-      };
-    });
-    setFriendCommentDrafts((current) => ({ ...current, [friendId]: "" }));
+      });
+      setAnalysis(result);
+      setAnalysisStatus("success");
+    } catch (error) {
+      setAnalysisError(error instanceof Error ? error.message : "Could not analyze this outfit.");
+      setAnalysisStatus("error");
+    }
   }
 
   function openAccountMenu() {
@@ -288,7 +369,7 @@ export default function HomePage() {
 
   function handleLogout() {
     try {
-      window.localStorage.removeItem("fitcheck-session");
+      clearAuth();
     } finally {
       navigate("/login");
     }
@@ -621,39 +702,67 @@ export default function HomePage() {
               <h1 id="friends-heading">Friends</h1>
               <p>See what your friends are wearing and share your take.</p>
             </header>
+            <div className="friends-scope" role="group" aria-label="Choose a feed">
+              <button type="button" className={friendsScope === "following" ? "primary-btn" : "secondary-btn"} onClick={() => setFriendsScope("following")}>
+                Following
+              </button>
+              <button type="button" className={friendsScope === "all" ? "primary-btn" : "secondary-btn"} onClick={() => setFriendsScope("all")}>
+                Everyone
+              </button>
+            </div>
+            {friendsStatus === "loading" && <p className="style-guide-status" role="status">Loading outfits…</p>}
+            {friendsError && <p className="style-guide-error" role="alert">{friendsError}</p>}
+            {friendsStatus === "success" && friends.length === 0 && (
+              <p className="style-guide-status">
+                {friendsScope === "following"
+                  ? "You're not following anyone yet. Switch to Everyone to find outfits."
+                  : "No outfits have been posted yet."}
+              </p>
+            )}
             <div className="friends-grid">
-              {dummyFriends.map((friend) => {
-                const feedback = friendFeedback[friend.id] || {};
-                const comments = [...friend.comments, ...(feedback.comments || [])];
+              {friends.map((outfit) => {
+                const author = outfit.author;
+                const comments = friendComments[outfit.id] || [];
+                const isOwnOutfit = author.username === username;
                 return (
-                  <article className="friend-card" key={friend.id}>
+                  <article className="friend-card" key={outfit.id}>
                     <header className="friend-card-header">
-                      <div className="friend-avatar" aria-hidden="true">{friend.username.slice(0, 2).toUpperCase()}</div>
+                      <div className="friend-avatar" aria-hidden="true">{author.username.slice(0, 2).toUpperCase()}</div>
                       <div>
-                        <h2>{friend.username}</h2>
-                        <time>{friend.postedAt}</time>
+                        <h2>{author.username}</h2>
+                        <time dateTime={outfit.created_at}>
+                          {new Date(outfit.created_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}
+                        </time>
                       </div>
                     </header>
-                    <img className="friend-photo" src={friend.photo} alt={`${friend.username} wearing ${friend.fitName}`} />
+                    {outfit.cover_image_url && (
+                      <img className="friend-photo" src={outfit.cover_image_url} alt={`${author.username} wearing ${outfit.title}`} />
+                    )}
                     <div className="friend-card-details">
-                      <h3>{friend.fitName}</h3>
-                      <p className="friend-fit-score"><span>Fit score</span><strong>{friend.fitScore.toFixed(1)} / 10</strong></p>
-                      <p className="friend-style-worn">{friend.styleWorn}</p>
+                      <h3>{outfit.title}</h3>
+                      <p className="friend-fit-score">
+                        <span>Community rating</span>
+                        <strong>
+                          {outfit.rating_count ? `${outfit.rating_avg.toFixed(1)} / 5 (${outfit.rating_count})` : "No ratings yet"}
+                        </strong>
+                      </p>
+                      {outfit.description && <p className="friend-style-worn">{outfit.description}</p>}
 
-                      <section className="friend-rating-section" aria-label={`Rate ${friend.username}'s outfit`}>
+                      <section className="friend-rating-section" aria-label={`Rate ${author.username}'s outfit`}>
                         <div className="friend-rating-heading">
                           <span>Your rating</span>
-                          <output>{feedback.rating ? `${feedback.rating} / 5` : "Not rated"}</output>
+                          <span>{outfit.my_rating ? `${outfit.my_rating} / 5` : isOwnOutfit ? "Your outfit" : "Not rated"}</span>
                         </div>
-                        <div className="friend-stars" role="group" aria-label={`Rate ${friend.username} out of five stars`}>
+                        <div className="friend-stars" role="group" aria-label={`Rate ${author.username} out of five stars`}>
                           {[1, 2, 3, 4, 5].map((star) => (
                             <button
-                              className={`friend-star${feedback.rating >= star ? " selected" : ""}`}
+                              className={`friend-star${outfit.my_rating >= star ? " selected" : ""}`}
                               key={star}
                               type="button"
+                              disabled={isOwnOutfit}
                               aria-label={`${star} ${star === 1 ? "star" : "stars"}`}
-                              aria-pressed={feedback.rating === star}
-                              onClick={() => rateFriendFit(friend.id, star)}
+                              aria-pressed={outfit.my_rating === star}
+                              onClick={() => rateFriendFit(outfit.id, star)}
                             >
                               &#9733;
                             </button>
@@ -661,25 +770,25 @@ export default function HomePage() {
                         </div>
                       </section>
 
-                      <section className="friend-comments" aria-label={`Comments on ${friend.username}'s fit`}>
+                      <section className="friend-comments" aria-label={`Comments on ${author.username}'s fit`}>
                         <h4>Comments</h4>
                         <ul>
                           {comments.map((comment) => (
-                            <li key={comment.id}><strong>{comment.username}</strong><p>{comment.text}</p></li>
+                            <li key={comment.id}><strong>{comment.author?.username}</strong><p>{comment.body}</p></li>
                           ))}
                         </ul>
-                        <form className="friend-comment-form" onSubmit={(event) => addFriendComment(event, friend.id)}>
-                          <label htmlFor={`friend-comment-${friend.id}`}>Add a comment</label>
+                        <form className="friend-comment-form" onSubmit={(event) => addFriendComment(event, outfit.id)}>
+                          <label htmlFor={`friend-comment-${outfit.id}`}>Add a comment</label>
                           <input
-                            id={`friend-comment-${friend.id}`}
+                            id={`friend-comment-${outfit.id}`}
                             type="text"
-                            value={friendCommentDrafts[friend.id] || ""}
-                            onChange={(event) => setFriendCommentDrafts((current) => ({ ...current, [friend.id]: event.target.value }))}
+                            value={friendCommentDrafts[outfit.id] || ""}
+                            onChange={(event) => setFriendCommentDrafts((current) => ({ ...current, [outfit.id]: event.target.value }))}
                             placeholder="What do you think?"
                             autoComplete="off"
                             maxLength="240"
                           />
-                          <button className="secondary-btn" type="submit" disabled={!friendCommentDrafts[friend.id]?.trim()}>
+                          <button className="secondary-btn" type="submit" disabled={!friendCommentDrafts[outfit.id]?.trim()}>
                             Comment
                           </button>
                         </form>
@@ -824,7 +933,7 @@ export default function HomePage() {
                 <h1>Check your fit!</h1>
                 <p>Snap a picture, see your rating, and get a little styling advice.</p>
               </div>
-              <button type="button" className="link-btn" onClick={() => setActiveTab("Discover")}>
+              <button type="button" className="link-btn" onClick={() => setActiveTab("Style Guide")}>
                 Discover more styles
               </button>
             </header>
@@ -923,7 +1032,7 @@ export default function HomePage() {
                         Take fit photo
                       </button>
                     ) : null}
-                    <span>Your photo stays in this session and is not uploaded.</span>
+                    <span>Your photo is only sent when you tap Analyze, and it is not stored.</span>
                   </div>
                   {cameraSwitchMessage && <p className="camera-switch-message" role="status">{cameraSwitchMessage}</p>}
                 </section>
@@ -931,15 +1040,69 @@ export default function HomePage() {
                 {capturedFit ? (
                   <section className="fit-feedback">
                     <p className="mini-label">After the photo</p>
-                    <h2>Small tweaks, polished finish</h2>
-                    <p className="feedback-disclaimer">
-                      These are general styling ideas, not automated image analysis.
-                    </p>
-                    <ul className="improvement-list">
-                      <li><span>01</span><p>Try a defined waist with a belt or a front tuck to give the outfit more shape.</p></li>
-                      <li><span>02</span><p>Add one warm-metal accessory to bring a focal point to the look.</p></li>
-                      <li><span>03</span><p>Layer a tailored outer piece for extra structure and a more finished feel.</p></li>
-                    </ul>
+                    <h2>{analysis ? "Your fit, reviewed" : "Ready for your review?"}</h2>
+                    <form
+                      className="analysis-form"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        analyzeFit();
+                      }}
+                    >
+                      <label htmlFor="target-style">What style are you going for?</label>
+                      <div className="analysis-form-row">
+                        <input
+                          id="target-style"
+                          className="style-guide-input"
+                          value={targetStyle}
+                          onChange={(event) => setTargetStyle(event.target.value)}
+                          placeholder="e.g. relaxed autumn streetwear"
+                          maxLength={300}
+                          required
+                        />
+                        <button className="primary-btn" type="submit" disabled={analysisStatus === "loading" || !targetStyle.trim()}>
+                          {analysisStatus === "loading" ? "Analyzing…" : analysis ? "Analyze again" : "Analyze my fit"}
+                        </button>
+                      </div>
+                    </form>
+                    {analysisStatus === "loading" && <p className="style-guide-status" role="status">Your stylist is taking a look…</p>}
+                    {analysisError && <p className="style-guide-error" role="alert">{analysisError}</p>}
+
+                    {analysis && (
+                      <div aria-live="polite">
+                        <p className="analysis-verdict">{analysis.verdict}</p>
+                        <div className="analysis-chips">
+                          {analysis.detectedStyle && <span>Style: {analysis.detectedStyle}</span>}
+                          {analysis.colors?.map((color) => <span key={color}>{color}</span>)}
+                          {analysis.score !== null && <span>{analysis.colorsMatch ? "Colors match" : "Colors clash"}</span>}
+                        </div>
+                        {analysis.whatsWorking?.length > 0 && (
+                          <>
+                            <h3>What's working</h3>
+                            <ul className="improvement-list">
+                              {analysis.whatsWorking.map((point, index) => (
+                                <li key={point}><span>{String(index + 1).padStart(2, "0")}</span><p>{point}</p></li>
+                              ))}
+                            </ul>
+                          </>
+                        )}
+                        {analysis.improvements?.length > 0 && (
+                          <>
+                            <h3>Small tweaks</h3>
+                            <ul className="improvement-list">
+                              {analysis.improvements.map((point, index) => (
+                                <li key={point}><span>{String(index + 1).padStart(2, "0")}</span><p>{point}</p></li>
+                              ))}
+                            </ul>
+                          </>
+                        )}
+                        {analysis.weatherFit?.note && (
+                          <p className="analysis-weather">
+                            {analysis.weatherFit.ok === false ? "Weather check: " : "Weather: "}
+                            {analysis.weatherFit.note}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </section>
                 ) : (
                   <div className="fit-feedback fit-feedback-empty">
@@ -957,16 +1120,22 @@ export default function HomePage() {
                     </div>
                     <span className="weather-icon" aria-hidden="true">☼</span>
                   </div>
-                  <WeatherBadge />
+                  <WeatherBadge onLoaded={setWeather} />
                 </section>
 
                 <section className="rating-card">
                   <p className="mini-label">Your style score</p>
                   <div className="rating-row">
-                    <strong>{capturedFit ? "8.5" : "—"}</strong>
+                    <strong>{analysis?.score ?? "—"}</strong>
                     <span>/ 10</span>
                   </div>
-                  <p>{capturedFit ? "Sample editorial score; photo-based outfit analysis is not connected yet." : "Take a photo of your fit to reveal your style score."}</p>
+                  <p>
+                    {analysis
+                      ? (analysis.score === null ? "No outfit detected in this photo." : "Scored by your AI stylist.")
+                      : capturedFit
+                        ? "Add your target style and tap Analyze to see your score."
+                        : "Take a photo of your fit to reveal your style score."}
+                  </p>
                 </section>
 
                 <section className="similar-card">
